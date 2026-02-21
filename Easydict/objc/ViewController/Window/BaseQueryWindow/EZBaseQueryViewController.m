@@ -152,6 +152,8 @@ static void dispatch_block_on_main_safely(dispatch_block_t block) {
             //            MMLogInfo(@"lockResizeWindow");
             return;
         }
+        
+        MMLogInfo(@"resize window, update window height");
 
         [self setNeedUpdateIframeHeightForAllResults];
 
@@ -1622,7 +1624,7 @@ static void dispatch_block_on_main_safely(dispatch_block_t block) {
         self.lockResizeWindow = YES;
     }
 
-    //    MMLogInfo(@"updateWindowViewHeightWithLock");
+        MMLogInfo(@"updateWindowViewHeightWithLock");
 
     CGFloat tableViewHeight = [self getScrollViewContentHeight];
     CGFloat height = [self getRestrainedScrollViewHeight:tableViewHeight];
