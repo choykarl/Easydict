@@ -2,7 +2,6 @@
 allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git commit:*), Bash(printf:*), Bash(cat:*), Bash(echo:*), Bash(rm:*)
 argument-hint: [message]
 description: Generate an Angular-style git commit message
-model: ANTHROPIC_DEFAULT_HAIKU_MODEL
 ---
 
 # Angular-style git commit message generator
