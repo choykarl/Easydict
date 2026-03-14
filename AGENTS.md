@@ -54,12 +54,16 @@ Translation services inherit from a base query service. Each service lives in it
 
 ## Coding Standards
 
-See [code-style.md](code-style.md) for detailed coding rules.
+See [code-style.md](.claude/rules/code-style.md) for detailed coding rules.
 
 ## Localization
 
-See [localization.md](localization.md) for detailed localization rules.
+See [localization.md](.claude/rules/localization.md) for detailed localization rules.
 
 ## Git Commit Messages
 
-See [commit.md](commit.md) for Angular-style commit message guidelines.
+See [SKILL.md](.claude/skills/git-commit/SKILL.md) for Angular-style commit message guidelines.
+
+## MCP Servers
+
+Always use the OpenAI developer documentation MCP server if you need to work with the OpenAI API, ChatGPT Apps SDK, Codex,… without me having to explicitly ask.
