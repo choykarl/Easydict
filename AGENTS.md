@@ -14,14 +14,8 @@ The project is currently **actively migrating from Objective-C to Swift + SwiftU
 
 **Note:** All new development should prefer modern Swift and SwiftUI APIs available on macOS 13.0+ to ensure cleaner, safer, and future‑proof code.
 
-## Build Commands
-
-In general, do not need to run `xcodebuild` commands if not demanded.
-
-See [build.md](build.md) for common build and test commands.
-
 ## Code Architecture
-****
+
 ### Directory Structure
 
 - `Easydict/App/` - App entry point, bridging header, assets, localization
@@ -51,6 +45,12 @@ Translation services inherit from a base query service. Each service lives in it
 - Bridging header at `Easydict/App/Easydict-Bridging-Header.h`
 - PCH file at `Easydict/App/PrefixHeader.pch`
 - String localization uses Xcode String Catalogs (`Localizable.xcstrings` files)
+
+## Build Commands
+
+In general, do not need to run `xcodebuild` commands if not demanded.
+
+See [build.md](.claude/rules/build.md) for common build and test commands.
 
 ## Coding Standards
 
