@@ -267,7 +267,7 @@
 		039D119929D5E26300C93F46 /* EZAudioUtils.m in Sources */ = {isa = PBXBuildFile; fileRef = 039D119829D5E26300C93F46 /* EZAudioUtils.m */; };
 		03A173E72CD120E600791B51 /* SelectedTextKit in Frameworks */ = {isa = PBXBuildFile; productRef = 03A173E62CD120E600791B51 /* SelectedTextKit */; };
 		03A1B2C32F70000100A1B2C3 /* MiniMaxService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03A1B2C42F70000100A1B2C3 /* MiniMaxService.swift */; };
-		03A220072D42414C00788927 /* (null) in Frameworks */ = {isa = PBXBuildFile; };
+		03A220072D42414C00788927 /* BuildFile in Frameworks */ = {isa = PBXBuildFile; };
 		03A3E1552BEBDB2000E7E210 /* Throttler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03A3E1542BEBDB2000E7E210 /* Throttler.swift */; };
 		03A5B4BF2E0AB23900BA8F2E /* String+OCR.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03A5B4BE2E0AB23900BA8F2E /* String+OCR.swift */; };
 		03A5E0922D3C020200FF7D95 /* StreamService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03A5E0912D3C020200FF7D95 /* StreamService.swift */; };
@@ -509,6 +509,7 @@
 		967712EA2B5B913600105E0F /* KeyHolder in Frameworks */ = {isa = PBXBuildFile; productRef = 967712E92B5B913600105E0F /* KeyHolder */; };
 		96B2F1C52C07782400AD3126 /* RepoInfoHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96B2F1C42C07782400AD3126 /* RepoInfoHelper.swift */; };
 		96DFEB832B82588000F5C7EF /* EZTableTipsCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 96DFEB822B82588000F5C7EF /* EZTableTipsCell.m */; };
+		9BFB9BB105C1788DDB661B73 /* Pods_Easydict.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9E1AD8C1D1A356A3F910E5C8 /* Pods_Easydict.framework */; };
 		A2016EDA90ED45B5B66FA986 /* AnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14921B68C1D645268F93668E /* AnalyticsService.swift */; };
 		A94F9CB9D704426DB91B25D3 /* DeviceSystemInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = E54300FF4F544CC2A180FE53 /* DeviceSystemInfo.swift */; };
 		AA0000012E00000000000001 /* QueryRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000022E00000000000001 /* QueryRecord.swift */; };
@@ -1228,7 +1229,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				03A220072D42414C00788927 /* (null) in Frameworks */,
+				03A220072D42414C00788927 /* BuildFile in Frameworks */,
 				5A3A753C59BD5443FA91764C /* Pods_EasydictTests.framework in Frameworks */,
 				FDDF871B2B055572E5C1013F /* Pods_EasydictTests.framework in Frameworks */,
 			);
@@ -1264,6 +1265,7 @@
 				03E534BC2CE0D38C00B37264 /* AcknowList in Frameworks */,
 				860409132DDD5F090095781D /* FirebaseAnalytics in Frameworks */,
 				5C5B3D6F80CB486E9D615E07 /* Sentry in Frameworks */,
+				9BFB9BB105C1788DDB661B73 /* Pods_Easydict.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3790,13 +3792,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Easydict/Pods-Easydict-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Easydict/Pods-Easydict-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -3833,13 +3831,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-EasydictTests/Pods-EasydictTests-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-EasydictTests/Pods-EasydictTests-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
