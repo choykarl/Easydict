@@ -1,28 +1,24 @@
 PODS:
   - JLRoutes (2.1)
-  - KVOController (1.2.0)
   - Masonry (1.1.0)
   - ReactiveObjC (3.1.1)
 
 DEPENDENCIES:
   - JLRoutes (~> 2.1)
-  - KVOController (~> 1.2.0)
   - Masonry (~> 1.1.0)
   - ReactiveObjC (~> 3.1.1)
 
 SPEC REPOS:
   https://github.com/CocoaPods/Specs.git:
     - JLRoutes
-    - KVOController
     - Masonry
     - ReactiveObjC
 
 SPEC CHECKSUMS:
   JLRoutes: d755245322b94227662ea3e43492fdca94e05c5b
-  KVOController: d72ace34afea42468329623b3379ab3cd1d286b6
   Masonry: 678fab65091a9290e40e2832a55e7ab731aad201
   ReactiveObjC: 011caa393aa0383245f2dcf9bf02e86b80b36040
 
-PODFILE CHECKSUM: 1c5815fb06afeafd9b261f83dbf07b89cacc2a32
+PODFILE CHECKSUM: d9859e9a8fd361fc9d0692550938762f82ec4e2a
 
 COCOAPODS: 1.16.2
