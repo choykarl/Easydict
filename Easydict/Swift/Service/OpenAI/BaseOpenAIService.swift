@@ -98,31 +98,26 @@ public class BaseOpenAIService: StreamService {
     override func validate() async -> QueryResult {
         let result = await super.validate()
 
-        guard let error = result.error, enableStreaming else {
+        guard let queryError = result.error as? QueryError,
+              queryError.type == .contentTypeMismatch,
+              enableStreaming
+        else {
             return result
         }
 
-        // Check if the error is a content-type mismatch (endpoint doesn't support SSE).
-        let description = String(describing: error).lowercased()
-        let isContentTypeError = description.contains("incorrectcontenttype")
-            || description.contains("incorrect content-type")
-
-        guard isContentTypeError else {
-            return result
-        }
-
-        // Retry without streaming.
-        logInfo("Streaming validation failed with content-type error, retrying without streaming...")
+        // Retry without streaming — temporarily override without persisting yet.
+        logInfo("Streaming validation failed with content-type mismatch, retrying without streaming...")
+        let originalStreaming = enableStreaming
         enableStreaming = false
         let retryResult = await super.validate()
 
         if retryResult.error != nil {
-            // Non-streaming also failed — restore streaming and return retry error.
-            enableStreaming = true
+            // Non-streaming also failed — restore original setting and return retry error.
+            enableStreaming = originalStreaming
             return retryResult
         }
 
-        // Non-streaming succeeded — keep streaming disabled, notify user.
+        // Non-streaming succeeded — commit the change and notify user.
         logInfo("Non-streaming validation succeeded, streaming auto-disabled.")
         retryResult.validationMessage = String(
             localized: "service.configuration.validation_success.streaming_disabled"
@@ -153,18 +148,27 @@ public class BaseOpenAIService: StreamService {
     )
         -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
-            Task {
+            let task = Task {
                 do {
+                    var query = query
+                    query.stream = false
+
                     var request = URLRequest(url: url, timeoutInterval: 60)
                     request.httpMethod = "POST"
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                    request.setValue("Bearer \(self.apiKey)", forHTTPHeaderField: "Authorization")
+                    if !self.apiKey.isEmpty {
+                        request.setValue(
+                            "Bearer \(self.apiKey)", forHTTPHeaderField: "Authorization"
+                        )
+                    }
                     request.httpBody = try JSONEncoder().encode(query)
 
                     let (data, response) = try await URLSession.shared.data(for: request)
+                    try Task.checkCancellation()
 
                     if let http = response as? HTTPURLResponse,
-                       !(200 ... 299).contains(http.statusCode) {
+                       !(200 ... 299).contains(http.statusCode)
+                    {
                         if let apiError = try? JSONDecoder().decode(
                             APIErrorResponse.self, from: data
                         ) {
@@ -178,13 +182,23 @@ public class BaseOpenAIService: StreamService {
                     }
 
                     let chatResult = try JSONDecoder().decode(ChatResult.self, from: data)
-                    if let content = chatResult.choices.first?.message.content?.string {
+                    if let content = chatResult.choices.first?.message.content?.string,
+                       !content.isEmpty
+                    {
                         continuation.yield(content)
+                        continuation.finish()
+                    } else {
+                        throw QueryError(type: .noResult)
                     }
+                } catch is CancellationError {
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)
                 }
+            }
+
+            continuation.onTermination = { @Sendable _ in
+                task.cancel()
             }
         }
     }

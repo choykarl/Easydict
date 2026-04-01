@@ -276,6 +276,7 @@ public class QueryResult: NSObject {
         translatedResults = nil
         wordResult = nil
         error = nil
+        validationMessage = nil
         serviceTypeWithUniqueIdentifier = ServiceType.youdao.rawValue
         service?.audioPlayer.stop()
         service = nil

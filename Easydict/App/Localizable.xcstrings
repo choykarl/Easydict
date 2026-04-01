@@ -298,6 +298,34 @@
         }
       }
     },
+    "content_type_mismatch_error" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Content-Type Mismatch"
+          }
+        },
+        "sk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nezhoda Content-Type"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "响应格式不匹配"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回應格式不符"
+          }
+        }
+      }
+    },
     "app_shortcut_setting" : {
       "extractionState" : "manual",
       "localizations" : {
