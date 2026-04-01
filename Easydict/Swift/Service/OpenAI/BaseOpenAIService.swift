@@ -27,6 +27,9 @@ public class BaseOpenAIService: StreamService {
 
     let control = StreamControl()
 
+    /// Temporary override for streaming during validate retry. `nil` means use the persisted value.
+    private var streamingOverride: Bool?
+
     override func contentStreamTranslate(
         _ text: String,
         from: Language,
@@ -76,7 +79,8 @@ public class BaseOpenAIService: StreamService {
 
         let query = ChatQuery(messages: chatHistory, model: model, temperature: temperature)
 
-        if enableStreaming {
+        let useStreaming = streamingOverride ?? enableStreaming
+        if useStreaming {
             let openAI = OpenAI(apiToken: apiKey)
 
             // FIXME: It seems that `control` will cause a memory leak, but it is not clear how to solve it.
@@ -105,19 +109,19 @@ public class BaseOpenAIService: StreamService {
             return result
         }
 
-        // Retry without streaming — temporarily override without persisting yet.
+        // Retry without streaming using a temporary override (not persisted yet).
         logInfo("Streaming validation failed with content-type mismatch, retrying without streaming...")
-        let originalStreaming = enableStreaming
-        enableStreaming = false
+        streamingOverride = false
         let retryResult = await super.validate()
+        streamingOverride = nil
 
         if retryResult.error != nil {
-            // Non-streaming also failed — restore original setting and return retry error.
-            enableStreaming = originalStreaming
+            // Non-streaming also failed — return retry error without changing settings.
             return retryResult
         }
 
-        // Non-streaming succeeded — commit the change and notify user.
+        // Non-streaming succeeded — now persist the change and notify user.
+        enableStreaming = false
         logInfo("Non-streaming validation succeeded, streaming auto-disabled.")
         retryResult.validationMessage = String(
             localized: "service.configuration.validation_success.streaming_disabled"

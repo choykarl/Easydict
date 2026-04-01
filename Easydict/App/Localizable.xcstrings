@@ -5054,7 +5054,7 @@
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enable Streaming"
+            "value" : "Povoliť streamovanie"
           }
         },
         "zh-Hans" : {
@@ -5082,7 +5082,7 @@
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Disable if the endpoint does not support streaming responses."
+            "value" : "Vypnite, ak koncový bod nepodporuje streamované odpovede."
           }
         },
         "zh-Hans" : {
@@ -5110,7 +5110,7 @@
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Streaming is not supported by this endpoint and has been auto-disabled."
+            "value" : "Tento koncový bod nepodporuje streamovanie a bolo automaticky vypnuté."
           }
         },
         "zh-Hans" : {
@@ -5138,7 +5138,7 @@
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Endpoint returned an HTML page"
+            "value" : "Koncový bod vrátil HTML stránku"
           }
         },
         "zh-Hans" : {
@@ -5166,7 +5166,7 @@
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Please check that the endpoint URL is correct and includes the full API path."
+            "value" : "Skontrolujte, či je URL koncového bodu správna a obsahuje úplnú cestu API."
           }
         },
         "zh-Hans" : {
@@ -5194,7 +5194,7 @@
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Endpoint returned JSON instead of a stream"
+            "value" : "Koncový bod vrátil JSON namiesto streamu"
           }
         },
         "zh-Hans" : {
@@ -5222,7 +5222,7 @@
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Try disabling \"Enable Streaming\" in the service settings."
+            "value" : "Skúste vypnúť \"Povoliť streamovanie\" v nastaveniach služby."
           }
         },
         "zh-Hans" : {
@@ -5250,7 +5250,7 @@
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unexpected response format"
+            "value" : "Neočakávaný formát odpovede"
           }
         },
         "zh-Hans" : {
@@ -5278,7 +5278,7 @@
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The endpoint may not be fully OpenAI-compatible. Check the endpoint URL and API documentation."
+            "value" : "Koncový bod nemusí byť plne kompatibilný s OpenAI. Skontrolujte URL a dokumentáciu API."
           }
         },
         "zh-Hans" : {

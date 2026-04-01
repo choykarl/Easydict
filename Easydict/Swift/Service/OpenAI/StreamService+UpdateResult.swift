@@ -176,7 +176,8 @@ extension StreamService {
             )
         }
 
-        return .queryError(from: error) ?? QueryError(type: .api)
+        // queryError(from:) always returns non-nil for a non-nil error.
+        .queryError(from: error) ?? QueryError(type: .api)
     }
 
     /// Shared check for Content-Type mismatch patterns across error detection paths.
