@@ -116,8 +116,9 @@ public class BaseOpenAIService: StreamService {
         streamingOverride = nil
 
         if retryResult.error != nil {
-            // Non-streaming also failed — return retry error without changing settings.
-            return retryResult
+            // Non-streaming also failed — return the original error which has better diagnostics
+            // (e.g. "text/html → check your URL" is more helpful than a generic retry failure).
+            return result
         }
 
         // Non-streaming succeeded — now persist the change and notify user.
@@ -157,7 +158,7 @@ public class BaseOpenAIService: StreamService {
                     var query = query
                     query.stream = false
 
-                    var request = URLRequest(url: url, timeoutInterval: 60)
+                    var request = URLRequest(url: url, timeoutInterval: EZNetWorkTimeoutInterval)
                     request.httpMethod = "POST"
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     if !self.apiKey.isEmpty {
