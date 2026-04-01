@@ -5015,6 +5015,90 @@
         }
       }
     },
+    "service.configuration.custom_openai.enable_streaming.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable Streaming"
+          }
+        },
+        "sk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable Streaming"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用流式传输"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "啟用串流傳輸"
+          }
+        }
+      }
+    },
+    "service.configuration.custom_openai.enable_streaming.footnote" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disable if the endpoint does not support streaming responses."
+          }
+        },
+        "sk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disable if the endpoint does not support streaming responses."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如果端点不支持流式响应，请关闭此选项。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如果端點不支援串流回應，請關閉此選項。"
+          }
+        }
+      }
+    },
+    "service.configuration.validation_success.streaming_disabled" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Streaming is not supported by this endpoint and has been auto-disabled."
+          }
+        },
+        "sk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Streaming is not supported by this endpoint and has been auto-disabled."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该端点不支持流式传输，已自动关闭。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "該端點不支援串流傳輸，已自動關閉。"
+          }
+        }
+      }
+    },
     "error.content_type.html" : {
       "localizations" : {
         "en" : {

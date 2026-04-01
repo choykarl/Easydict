@@ -40,7 +40,7 @@ public class StreamService: QueryService {
     // MARK: Public
 
     public override func isStream() -> Bool {
-        true
+        enableStreaming
     }
 
     public override func intelligentQueryTextType() -> EZQueryTextType {
@@ -331,6 +331,15 @@ public class StreamService: QueryService {
 
     var temperature: Double {
         Defaults[temperatureKey]
+    }
+
+    var enableStreamingKey: Defaults.Key<Bool> {
+        boolDefaultsKey(.enableStreaming, defaultValue: true)
+    }
+
+    var enableStreaming: Bool {
+        get { Defaults[enableStreamingKey] }
+        set { Defaults[enableStreamingKey] = newValue }
     }
 
     func validModels(from supportedModels: String) -> [String] {

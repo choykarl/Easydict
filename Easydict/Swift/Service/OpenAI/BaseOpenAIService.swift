@@ -75,17 +75,59 @@ public class BaseOpenAIService: StreamService {
         }
 
         let query = ChatQuery(messages: chatHistory, model: model, temperature: temperature)
-        let openAI = OpenAI(apiToken: apiKey)
 
-        // FIXME: It seems that `control` will cause a memory leak, but it is not clear how to solve it.
-        unowned let unownedControl = control
+        if enableStreaming {
+            let openAI = OpenAI(apiToken: apiKey)
 
-        let chatStream: AsyncThrowingStream<ChatStreamResult, Error> = openAI.chatsStream(
-            query: query,
-            url: url,
-            control: unownedControl
+            // FIXME: It seems that `control` will cause a memory leak, but it is not clear how to solve it.
+            unowned let unownedControl = control
+
+            let chatStream: AsyncThrowingStream<ChatStreamResult, Error> = openAI.chatsStream(
+                query: query,
+                url: url,
+                control: unownedControl
+            )
+            return chatStreamToContentStream(chatStream)
+        } else {
+            return nonStreamingTranslate(query: query, url: url)
+        }
+    }
+
+    /// Validates the service, automatically falling back to non-streaming if the endpoint
+    /// returns an incorrect Content-Type (e.g. `application/json` instead of `text/event-stream`).
+    override func validate() async -> QueryResult {
+        let result = await super.validate()
+
+        guard let error = result.error, enableStreaming else {
+            return result
+        }
+
+        // Check if the error is a content-type mismatch (endpoint doesn't support SSE).
+        let description = String(describing: error).lowercased()
+        let isContentTypeError = description.contains("incorrectcontenttype")
+            || description.contains("incorrect content-type")
+
+        guard isContentTypeError else {
+            return result
+        }
+
+        // Retry without streaming.
+        logInfo("Streaming validation failed with content-type error, retrying without streaming...")
+        enableStreaming = false
+        let retryResult = await super.validate()
+
+        if retryResult.error != nil {
+            // Non-streaming also failed — restore streaming and return retry error.
+            enableStreaming = true
+            return retryResult
+        }
+
+        // Non-streaming succeeded — keep streaming disabled, notify user.
+        logInfo("Non-streaming validation succeeded, streaming auto-disabled.")
+        retryResult.validationMessage = String(
+            localized: "service.configuration.validation_success.streaming_disabled"
         )
-        return chatStreamToContentStream(chatStream)
+        return retryResult
     }
 
     override func serviceChatMessageModels(_ chatQuery: ChatQueryParam) -> [Any] {
@@ -100,5 +142,50 @@ public class BaseOpenAIService: StreamService {
             }
         }
         return chatMessages
+    }
+
+    // MARK: Private
+
+    /// Perform a non-streaming chat completion, yielding the full response as a single chunk.
+    private func nonStreamingTranslate(
+        query: ChatQuery,
+        url: URL
+    )
+        -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    var request = URLRequest(url: url, timeoutInterval: 60)
+                    request.httpMethod = "POST"
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    request.setValue("Bearer \(self.apiKey)", forHTTPHeaderField: "Authorization")
+                    request.httpBody = try JSONEncoder().encode(query)
+
+                    let (data, response) = try await URLSession.shared.data(for: request)
+
+                    if let http = response as? HTTPURLResponse,
+                       !(200 ... 299).contains(http.statusCode) {
+                        if let apiError = try? JSONDecoder().decode(
+                            APIErrorResponse.self, from: data
+                        ) {
+                            throw apiError
+                        }
+                        throw QueryError(
+                            type: .api,
+                            message: "HTTP \(http.statusCode)",
+                            errorDataMessage: String(data: data, encoding: .utf8)
+                        )
+                    }
+
+                    let chatResult = try JSONDecoder().decode(ChatResult.self, from: data)
+                    if let content = chatResult.choices.first?.message.content?.string {
+                        continuation.yield(content)
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
     }
 }
