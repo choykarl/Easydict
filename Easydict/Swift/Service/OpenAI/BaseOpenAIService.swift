@@ -19,6 +19,8 @@ public class BaseOpenAIService: StreamService {
 
     open override func cancelStream() {
         control.cancel()
+        nonStreamingTask?.cancel()
+        nonStreamingTask = nil
     }
 
     // MARK: Internal
@@ -29,6 +31,9 @@ public class BaseOpenAIService: StreamService {
 
     /// Temporary override for streaming during validate retry. `nil` means use the persisted value.
     private var streamingOverride: Bool?
+
+    /// Reference to the in-flight non-streaming task so `cancelStream()` can cancel it.
+    private var nonStreamingTask: Task<Void, Never>?
 
     override func contentStreamTranslate(
         _ text: String,
@@ -152,7 +157,7 @@ public class BaseOpenAIService: StreamService {
         url: URL
     )
         -> AsyncThrowingStream<String, Error> {
-        AsyncThrowingStream { continuation in
+        AsyncThrowingStream { [weak self] continuation in
             let task = Task {
                 do {
                     var query = query
@@ -202,6 +207,7 @@ public class BaseOpenAIService: StreamService {
                 }
             }
 
+            self?.nonStreamingTask = task
             continuation.onTermination = { @Sendable _ in
                 task.cancel()
             }
