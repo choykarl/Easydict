@@ -157,8 +157,12 @@ public class BaseOpenAIService: StreamService {
         url: URL
     )
         -> AsyncThrowingStream<String, Error> {
-        AsyncThrowingStream { [weak self] continuation in
+        let apiKey = apiKey
+
+        return AsyncThrowingStream { [weak self] continuation in
             let task = Task {
+                defer { self?.nonStreamingTask = nil }
+
                 do {
                     var query = query
                     query.stream = false
@@ -166,9 +170,9 @@ public class BaseOpenAIService: StreamService {
                     var request = URLRequest(url: url, timeoutInterval: EZNetWorkTimeoutInterval)
                     request.httpMethod = "POST"
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                    if !self.apiKey.isEmpty {
+                    if !apiKey.isEmpty {
                         request.setValue(
-                            "Bearer \(self.apiKey)", forHTTPHeaderField: "Authorization"
+                            "Bearer \(apiKey)", forHTTPHeaderField: "Authorization"
                         )
                     }
                     request.httpBody = try JSONEncoder().encode(query)
