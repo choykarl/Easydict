@@ -61,7 +61,7 @@ extension StreamService {
                 } else if shouldIgnoreCompletionError(error, resultText: resultText) {
                     logInfo("Ignore stream completion error with existing content: \(error)")
                 } else {
-                    queryError = .queryError(from: error)
+                    queryError = classifiedQueryError(from: error)
                 }
             } else if resultText?.isEmpty ?? true {
                 // If error is nil but result text is also empty, we should report error.
@@ -139,8 +139,9 @@ extension StreamService {
             lowercasedErrorContext.contains("incorrectcontenttype(")
                 || lowercasedErrorContext.contains("incorrect content-type:")
                 || lowercasedErrorContext.contains("unacceptable content-type:")
-        let isTextPlainMIME = lowercasedErrorContext.contains("text/plain")
-        let shouldSuppress = isContentTypeError && isTextPlainMIME
+        let isKnownMIME = lowercasedErrorContext.contains("text/plain")
+            || lowercasedErrorContext.contains("application/json")
+        let shouldSuppress = isContentTypeError && isKnownMIME
 
         if shouldSuppress {
             logInfo(
@@ -150,6 +151,35 @@ extension StreamService {
         }
 
         return shouldSuppress
+    }
+
+    /// Build a user-friendly QueryError by classifying the Content-Type of the response.
+    private func classifiedQueryError(from error: Error) -> QueryError {
+        let context = errorContextString(error).lowercased()
+
+        if context.contains("incorrectcontenttype(") || context.contains("incorrect content-type") {
+            if context.contains("text/html") {
+                return QueryError(
+                    type: .api,
+                    message: String(localized: "error.content_type.html"),
+                    errorDataMessage: String(localized: "error.content_type.html.suggestion")
+                )
+            }
+            if context.contains("application/json") {
+                return QueryError(
+                    type: .api,
+                    message: String(localized: "error.content_type.json"),
+                    errorDataMessage: String(localized: "error.content_type.json.suggestion")
+                )
+            }
+            return QueryError(
+                type: .api,
+                message: String(localized: "error.content_type.unknown"),
+                errorDataMessage: String(localized: "error.content_type.unknown.suggestion")
+            )
+        }
+
+        return .queryError(from: error) ?? QueryError(type: .api)
     }
 
     private func errorContextString(_ error: Error) -> String {
