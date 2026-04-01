@@ -29,12 +29,6 @@ public class BaseOpenAIService: StreamService {
 
     let control = StreamControl()
 
-    /// Temporary override for streaming during validate retry. `nil` means use the persisted value.
-    private var streamingOverride: Bool?
-
-    /// Reference to the in-flight non-streaming task so `cancelStream()` can cancel it.
-    private var nonStreamingTask: Task<Void, Never>?
-
     override func contentStreamTranslate(
         _ text: String,
         from: Language,
@@ -107,7 +101,7 @@ public class BaseOpenAIService: StreamService {
     override func validate() async -> QueryResult {
         let result = await super.validate()
 
-        guard let queryError = result.error as? QueryError,
+        guard let queryError = result.error,
               queryError.type == .contentTypeMismatch,
               enableStreaming
         else {
@@ -151,6 +145,12 @@ public class BaseOpenAIService: StreamService {
 
     // MARK: Private
 
+    /// Temporary override for streaming during validate retry. `nil` means use the persisted value.
+    private var streamingOverride: Bool?
+
+    /// Reference to the in-flight non-streaming task so `cancelStream()` can cancel it.
+    private var nonStreamingTask: Task<(), Never>?
+
     /// Perform a non-streaming chat completion, yielding the full response as a single chunk.
     private func nonStreamingTranslate(
         query: ChatQuery,
@@ -181,8 +181,7 @@ public class BaseOpenAIService: StreamService {
                     try Task.checkCancellation()
 
                     if let http = response as? HTTPURLResponse,
-                       !(200 ... 299).contains(http.statusCode)
-                    {
+                       !(200 ... 299).contains(http.statusCode) {
                         if let apiError = try? JSONDecoder().decode(
                             APIErrorResponse.self, from: data
                         ) {
@@ -197,8 +196,7 @@ public class BaseOpenAIService: StreamService {
 
                     let chatResult = try JSONDecoder().decode(ChatResult.self, from: data)
                     if let content = chatResult.choices.first?.message.content?.string,
-                       !content.isEmpty
-                    {
+                       !content.isEmpty {
                         continuation.yield(content)
                         continuation.finish()
                     } else {
