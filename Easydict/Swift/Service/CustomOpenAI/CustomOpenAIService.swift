@@ -13,6 +13,8 @@ import Foundation
 class CustomOpenAIService: BaseOpenAIService {
     // MARK: Public
 
+    override var supportsStreamingToggle: Bool { true }
+
     public override func name() -> String {
         let serviceName = Defaults[super.nameKey]
         return serviceName.isEmpty ? NSLocalizedString("custom_openai", comment: "") : serviceName

@@ -17,6 +17,10 @@ import OpenAI
 public class BaseOpenAIService: StreamService {
     // MARK: Open
 
+    /// Whether this service exposes a streaming toggle in the settings UI.
+    /// Only services with a visible toggle should persist streaming auto-disable after fallback validation.
+    open var supportsStreamingToggle: Bool { false }
+
     open override func cancelStream() {
         control.cancel()
         nonStreamingTask?.cancel()
@@ -114,18 +118,18 @@ public class BaseOpenAIService: StreamService {
         let retryResult = await super.validate()
         streamingOverride = nil
 
-        if retryResult.error != nil {
-            // Non-streaming also failed — return the original error which has better diagnostics
-            // (e.g. "text/html → check your URL" is more helpful than a generic retry failure).
+        if let retryError = retryResult.error {
             return retryError.type == .contentTypeMismatch ? result : retryResult
         }
 
-        // Non-streaming succeeded — now persist the change and notify user.
-        enableStreaming = false
-        logInfo("Non-streaming validation succeeded, streaming auto-disabled.")
-        retryResult.validationMessage = String(
-            localized: "service.configuration.validation_success.streaming_disabled"
-        )
+        // Non-streaming succeeded — persist and notify only if this service has a streaming toggle.
+        if supportsStreamingToggle {
+            enableStreaming = false
+            logInfo("Non-streaming validation succeeded, streaming auto-disabled.")
+            retryResult.validationMessage = String(
+                localized: "service.configuration.validation_success.streaming_disabled"
+            )
+        }
         return retryResult
     }
 
@@ -203,7 +207,7 @@ public class BaseOpenAIService: StreamService {
                         throw QueryError(type: .noResult)
                     }
                 } catch is CancellationError {
-                    continuation.finish()
+                    continuation.finish(throwing: CancellationError())
                 } catch {
                     continuation.finish(throwing: error)
                 }
