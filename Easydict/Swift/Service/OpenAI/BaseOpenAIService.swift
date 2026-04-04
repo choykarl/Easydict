@@ -119,6 +119,8 @@ public class BaseOpenAIService: StreamService {
         streamingOverride = nil
 
         if let retryError = retryResult.error {
+            // Non-streaming also failed — return the original error which has better diagnostics
+            // (e.g. "text/html → check your URL" is more helpful than a generic retry failure).
             return retryError.type == .contentTypeMismatch ? result : retryResult
         }
 

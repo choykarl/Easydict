@@ -56,6 +56,7 @@ extension StreamService {
                     // User canceled the request; finish silently without surfacing an error result.
                     result.isStreamFinished = true
                     continuation.finish()
+                    return
                 } catch {
                     // Handle non-cancellation errors and notify the user.
                     result.isStreamFinished = true
