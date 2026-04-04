@@ -55,8 +55,12 @@ extension StreamService {
                 } catch is CancellationError {
                     // User canceled the request; still emit a terminal state so UI can stop loading.
                     result.isStreamFinished = true
-                    updateResultText(resultText, queryType: queryType, error: nil) { result in
-                        continuation.yield(result)
+                    // Avoid synthesizing a `.noResult` error when cancellation happens
+                    // before the first streamed token is received.
+                    if !resultText.isEmpty {
+                        updateResultText(resultText, queryType: queryType, error: nil) { result in
+                            continuation.yield(result)
+                        }
                     }
                     continuation.finish()
                     return

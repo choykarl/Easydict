@@ -122,10 +122,9 @@ public class BaseOpenAIService: StreamService {
         if let retryError = retryResult.error {
             // Non-streaming also failed — keep the original mismatch diagnostics unless
             // the retry error is clearly more actionable than a content-type mismatch.
-            if shouldPreferRetryError(retryError) {
-                return retryResult
+            if !shouldPreferRetryError(retryError) {
+                firstPassSnapshot.apply(to: retryResult)
             }
-            firstPassSnapshot.apply(to: retryResult)
             return retryResult
         }
 
@@ -168,14 +167,12 @@ public class BaseOpenAIService: StreamService {
         let validationMessage: String?
 
         init(result: QueryResult) {
-            if let error = result.error {
-                self.error = QueryError(
+            self.error = result.error.map { error in
+                QueryError(
                     type: error.type,
                     message: error.message,
                     errorDataMessage: error.errorDataMessage
                 )
-            } else {
-                self.error = nil
             }
             validationMessage = result.validationMessage
         }
@@ -188,12 +185,15 @@ public class BaseOpenAIService: StreamService {
 
     /// Whether the retry error should replace the original streaming mismatch diagnostics.
     private func shouldPreferRetryError(_ retryError: QueryError) -> Bool {
-        switch retryError.type {
-        case .missingSecretKey, .parameter, .unsupportedLanguage, .unsupportedQueryType:
-            true
-        default:
-            false
-        }
+        let preferredTypes: [QueryError.ErrorType] = [
+            .missingSecretKey,
+            .parameter,
+            .unsupportedLanguage,
+            .unsupportedQueryType,
+            .api,
+            .timeout,
+        ]
+        return preferredTypes.contains(retryError.type)
     }
 
     /// Perform a non-streaming chat completion, yielding the full response as a single chunk.
