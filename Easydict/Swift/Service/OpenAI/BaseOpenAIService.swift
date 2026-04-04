@@ -104,6 +104,7 @@ public class BaseOpenAIService: StreamService {
     /// returns an incorrect Content-Type (e.g. `application/json` instead of `text/event-stream`).
     override func validate() async -> QueryResult {
         let result = await super.validate()
+        let firstPassSnapshot = ValidationResultSnapshot(result: result)
 
         guard let queryError = result.error,
               queryError.type == .contentTypeMismatch,
@@ -119,9 +120,13 @@ public class BaseOpenAIService: StreamService {
         streamingOverride = nil
 
         if let retryError = retryResult.error {
-            // Non-streaming also failed — return the original error which has better diagnostics
-            // (e.g. "text/html → check your URL" is more helpful than a generic retry failure).
-            return retryError.type == .contentTypeMismatch ? result : retryResult
+            // Non-streaming also failed — keep the original mismatch diagnostics unless
+            // the retry error is clearly more actionable than a content-type mismatch.
+            if shouldPreferRetryError(retryError) {
+                return retryResult
+            }
+            firstPassSnapshot.apply(to: retryResult)
+            return retryResult
         }
 
         // Non-streaming succeeded — persist and notify only if this service has a streaming toggle.
@@ -156,6 +161,40 @@ public class BaseOpenAIService: StreamService {
 
     /// Reference to the in-flight non-streaming task so `cancelStream()` can cancel it.
     private var nonStreamingTask: Task<(), Never>?
+
+    /// Snapshot of first-pass validation context to avoid in-place mutation from `resetServiceResult()`.
+    private struct ValidationResultSnapshot {
+        let error: QueryError?
+        let validationMessage: String?
+
+        init(result: QueryResult) {
+            if let error = result.error {
+                self.error = QueryError(
+                    type: error.type,
+                    message: error.message,
+                    errorDataMessage: error.errorDataMessage
+                )
+            } else {
+                self.error = nil
+            }
+            validationMessage = result.validationMessage
+        }
+
+        func apply(to result: QueryResult) {
+            result.error = error
+            result.validationMessage = validationMessage
+        }
+    }
+
+    /// Whether the retry error should replace the original streaming mismatch diagnostics.
+    private func shouldPreferRetryError(_ retryError: QueryError) -> Bool {
+        switch retryError.type {
+        case .missingSecretKey, .parameter, .unsupportedLanguage, .unsupportedQueryType:
+            true
+        default:
+            false
+        }
+    }
 
     /// Perform a non-streaming chat completion, yielding the full response as a single chunk.
     private func nonStreamingTranslate(

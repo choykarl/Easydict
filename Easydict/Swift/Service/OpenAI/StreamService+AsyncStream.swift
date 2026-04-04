@@ -53,8 +53,11 @@ extension StreamService {
                         continuation.yield(result)
                     }
                 } catch is CancellationError {
-                    // User canceled the request; finish silently without surfacing an error result.
+                    // User canceled the request; still emit a terminal state so UI can stop loading.
                     result.isStreamFinished = true
+                    updateResultText(resultText, queryType: queryType, error: nil) { result in
+                        continuation.yield(result)
+                    }
                     continuation.finish()
                     return
                 } catch {
