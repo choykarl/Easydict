@@ -103,17 +103,23 @@ public class BaseOpenAIService: StreamService {
     /// Validates the service, automatically falling back to non-streaming if the endpoint
     /// returns an incorrect Content-Type (e.g. `application/json` instead of `text/event-stream`).
     override func validate() async -> QueryResult {
-        let result = await super.validate()
-        let firstPassSnapshot = ValidationResultSnapshot(result: result)
+        let firstPassResult = await super.validate()
+        // Snapshot uses cloned errors so the second `super.validate()` pass cannot mutate
+        // first-pass diagnostics in place (`resetServiceResult()` reuses `self.result`).
+        let firstPassSnapshot = ValidationResultSnapshot(result: firstPassResult)
 
-        guard let queryError = result.error,
-              queryError.type == .contentTypeMismatch,
-              enableStreaming
+        guard let firstPassError = firstPassSnapshot.error,
+              firstPassError.type == .contentTypeMismatch,
+              enableStreaming,
+              supportsStreamingToggle
         else {
-            return result
+            return firstPassResult
         }
 
         // Retry without streaming using a temporary override (not persisted yet).
+        // Only Custom OpenAI (and similar) exposes a streaming toggle; otherwise validation
+        // must reflect streaming reality — a silent non-streaming retry would report success
+        // while normal queries still use streaming and fail with the same mismatch.
         logInfo("Streaming validation failed with content-type mismatch, retrying without streaming...")
         streamingOverride = false
         let retryResult = await super.validate()
@@ -128,14 +134,12 @@ public class BaseOpenAIService: StreamService {
             return retryResult
         }
 
-        // Non-streaming succeeded — persist and notify only if this service has a streaming toggle.
-        if supportsStreamingToggle {
-            enableStreaming = false
-            logInfo("Non-streaming validation succeeded, streaming auto-disabled.")
-            retryResult.validationMessage = String(
-                localized: "service.configuration.validation_success.streaming_disabled"
-            )
-        }
+        // Non-streaming succeeded — `supportsStreamingToggle` was required to enter the retry path.
+        enableStreaming = false
+        logInfo("Non-streaming validation succeeded, streaming auto-disabled.")
+        retryResult.validationMessage = String(
+            localized: "service.configuration.validation_success.streaming_disabled"
+        )
         return retryResult
     }
 
@@ -247,6 +251,12 @@ public class BaseOpenAIService: StreamService {
                     } else {
                         throw QueryError(type: .noResult)
                     }
+                } catch let urlError as URLError where urlError.code == .cancelled {
+                    // Task cancellation often surfaces as URLError.cancelled from URLSession.
+                    continuation.finish(throwing: CancellationError())
+                } catch let nsError as NSError
+                    where nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled {
+                    continuation.finish(throwing: CancellationError())
                 } catch is CancellationError {
                     continuation.finish(throwing: CancellationError())
                 } catch {
