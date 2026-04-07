@@ -13,8 +13,6 @@ import Foundation
 class CustomOpenAIService: BaseOpenAIService {
     // MARK: Public
 
-    override var supportsStreamingToggle: Bool { true }
-
     public override func name() -> String {
         let serviceName = Defaults[super.nameKey]
         return serviceName.isEmpty ? NSLocalizedString("custom_openai", comment: "") : serviceName
@@ -25,6 +23,8 @@ class CustomOpenAIService: BaseOpenAIService {
     }
 
     // MARK: Internal
+
+    override var supportsStreamingToggle: Bool { true }
 
     override func serviceTypeWithUniqueIdentifier() -> String {
         guard !uuid.isEmpty else {

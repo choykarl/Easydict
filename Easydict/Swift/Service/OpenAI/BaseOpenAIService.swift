@@ -159,16 +159,9 @@ public class BaseOpenAIService: StreamService {
 
     // MARK: Private
 
-    /// Temporary override for streaming during validate retry. `nil` means use the persisted value.
-    private var streamingOverride: Bool?
-
-    /// Reference to the in-flight non-streaming task so `cancelStream()` can cancel it.
-    private var nonStreamingTask: Task<(), Never>?
-
     /// Snapshot of first-pass validation context to avoid in-place mutation from `resetServiceResult()`.
     private struct ValidationResultSnapshot {
-        let error: QueryError?
-        let validationMessage: String?
+        // MARK: Lifecycle
 
         init(result: QueryResult) {
             self.error = result.error.map { error in
@@ -178,14 +171,25 @@ public class BaseOpenAIService: StreamService {
                     errorDataMessage: error.errorDataMessage
                 )
             }
-            validationMessage = result.validationMessage
+            self.validationMessage = result.validationMessage
         }
+
+        // MARK: Internal
+
+        let error: QueryError?
+        let validationMessage: String?
 
         func apply(to result: QueryResult) {
             result.error = error
             result.validationMessage = validationMessage
         }
     }
+
+    /// Temporary override for streaming during validate retry. `nil` means use the persisted value.
+    private var streamingOverride: Bool?
+
+    /// Reference to the in-flight non-streaming task so `cancelStream()` can cancel it.
+    private var nonStreamingTask: Task<(), Never>?
 
     /// Whether the retry error should replace the original streaming mismatch diagnostics.
     private func shouldPreferRetryError(_ retryError: QueryError) -> Bool {
