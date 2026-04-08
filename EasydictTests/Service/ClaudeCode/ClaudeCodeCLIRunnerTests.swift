@@ -49,7 +49,9 @@ struct ClaudeCodeCLIRunnerTests {
     @Test("parseError detects rate_limit_event in stdout and returns quotaExceeded")
     func parseErrorRateLimitEventInStdout() {
         let rateLimitLine = #"{"type":"rate_limit_event","rate_limit_info":{"status":"rejected"}}"#
-        let resultLine = #"{"type":"result","subtype":"success","is_error":true,"result":"You've hit your limit \u00b7 resets 3am","duration_ms":100,"num_turns":1,"total_cost_usd":0,"usage":{},"modelUsage":{}}"#
+        let resultLine =
+            #"{"type":"result","subtype":"success","is_error":true,"result":"You've hit your limit \u00b7 resets 3am","#
+                + #""duration_ms":100,"num_turns":1,"total_cost_usd":0,"usage":{},"modelUsage":{}}"#
         let stdout = rateLimitLine + "\n" + resultLine
         let error = ClaudeCodeRunner.testParseError(fromStdout: stdout, stderr: "")
         #expect(error == .quotaExceeded(message: "You've hit your limit · resets 3am"))

@@ -34,7 +34,7 @@ final class ClaudeCodeRunner {
         // 1. Scan stdout for a rate_limit_event — this is the authoritative quota signal.
         //    Also capture the result message so we can surface the reset-time hint.
         var hasRateLimitEvent = false
-        var resultMessage: String? = nil
+        var resultMessage: String?
 
         for line in stdout.components(separatedBy: "\n") where !line.isEmpty {
             guard let data = line.data(using: .utf8) else { continue }
@@ -436,10 +436,10 @@ private final class ClaudeCodeLogger {
             guard logFiles.count > Self.maxLogFiles else { return }
 
             // Sort oldest first.
-            let sorted = logFiles.sorted { a, b in
-                let dateA = (try? a.resourceValues(forKeys: [.contentModificationDateKey]))?
+            let sorted = logFiles.sorted { argA, argB in
+                let dateA = (try? argA.resourceValues(forKeys: [.contentModificationDateKey]))?
                     .contentModificationDate ?? .distantPast
-                let dateB = (try? b.resourceValues(forKeys: [.contentModificationDateKey]))?
+                let dateB = (try? argB.resourceValues(forKeys: [.contentModificationDateKey]))?
                     .contentModificationDate ?? .distantPast
                 return dateA < dateB
             }
