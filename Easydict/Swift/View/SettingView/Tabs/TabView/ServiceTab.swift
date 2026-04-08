@@ -185,7 +185,7 @@ private struct ServiceItems: View {
                         handleMove(source: source, destination: destination, inSection: cliServices)
                     }
                 } header: {
-                    Text("setting.service.section.cli")
+                    Text("setting.service.section.agent_cli")
                         .font(.headline)
                 }
             }
@@ -198,7 +198,7 @@ private struct ServiceItems: View {
 
     private var freeServices: [QueryService] {
         viewModel.services.filter {
-            !$0.apiKeyRequirement().needsUserProvidedKey && $0.apiKeyRequirement() != .cli
+            !$0.apiKeyRequirement().needsUserProvidedKey && $0.apiKeyRequirement() != .agentCLI
         }
     }
 
@@ -207,7 +207,7 @@ private struct ServiceItems: View {
     }
 
     private var cliServices: [QueryService] {
-        viewModel.services.filter { $0.apiKeyRequirement() == .cli }
+        viewModel.services.filter { $0.apiKeyRequirement() == .agentCLI }
     }
 
     private var freeServicesWithID: [(QueryService, String)] {

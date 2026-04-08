@@ -8616,24 +8616,24 @@
         }
       }
     },
-    "setting.service.section.cli" : {
+    "setting.service.section.agent_cli" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CLI Translation"
+            "value" : "Agent CLI"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CLI 翻译"
+            "value" : "Agent CLI"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CLI 翻譯"
+            "value" : "Agent CLI"
           }
         }
       }

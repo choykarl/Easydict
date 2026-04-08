@@ -85,7 +85,7 @@ final class ClaudeCodeCLIRunner {
                         "--include-partial-messages",
                         "--verbose",
                         "--no-session-persistence",
-                        "--tools", "",         // disable all built-in tools
+                        "--tools", "", // disable all built-in tools
                         "--strict-mcp-config", // ignore user MCP config; no --mcp-config = no servers
                     ]
                     if let systemPrompt, !systemPrompt.isEmpty {

@@ -17,10 +17,10 @@ struct ClaudeCodeServiceTests {
         #expect(service.serviceType() == .claudeCode)
     }
 
-    @Test("apiKeyRequirement returns .cli")
+    @Test("apiKeyRequirement returns .agentCLI")
     func apiKeyRequirement() {
         let service = ClaudeCodeService()
-        #expect(service.apiKeyRequirement() == .cli)
+        #expect(service.apiKeyRequirement() == .agentCLI)
     }
 
     @Test("hasPrivateAPIKey returns false when no API key is configured")

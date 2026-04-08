@@ -29,7 +29,7 @@ class ClaudeCodeService: StreamService {
     }
 
     public override func apiKeyRequirement() -> ServiceAPIKeyRequirement {
-        .cli
+        .agentCLI
     }
 
     public override func cancelStream() {
