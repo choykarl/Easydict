@@ -15,12 +15,14 @@ public enum ServiceAPIKeyRequirement {
     case none
     case builtIn
     case userProvided
+    /// Service invoked via a local CLI tool; no API key needed.
+    case cli
 
     // MARK: Internal
 
     /// Whether this service requires an API key for requests.
     var requiresKeyForRequest: Bool {
-        self != .none
+        self != .none && self != .cli
     }
 
     /// Whether this service needs the user to provide an API key.

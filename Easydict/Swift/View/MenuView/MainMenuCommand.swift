@@ -39,6 +39,16 @@ struct EasydictMainMenu: Commands {
                 Text("check_updates")
             }
         })
+
+        #if DEBUG
+        // Debug menu — visible only in DEBUG builds
+        CommandMenu("Debug") {
+            Button("Claude Code Log") {
+                ClaudeCodeDebugWindowController.shared.toggle()
+            }
+            .keyboardShortcut("l", modifiers: [.command, .shift])
+        }
+        #endif
     }
 
     // MARK: Private

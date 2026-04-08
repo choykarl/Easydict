@@ -173,6 +173,22 @@ private struct ServiceItems: View {
                         .font(.headline)
                 }
             }
+
+            // CLI translation services section
+            if !cliServices.isEmpty {
+                Section {
+                    ForEach(cliServicesWithID, id: \.1) { service, _ in
+                        ServiceItemView(service: service, viewModel: viewModel)
+                            .tag(service)
+                    }
+                    .onMove { source, destination in
+                        handleMove(source: source, destination: destination, inSection: cliServices)
+                    }
+                } header: {
+                    Text("setting.service.section.cli")
+                        .font(.headline)
+                }
+            }
         }
     }
 
@@ -181,11 +197,17 @@ private struct ServiceItems: View {
     @EnvironmentObject private var viewModel: ServiceTabViewModel
 
     private var freeServices: [QueryService] {
-        viewModel.services.filter { !$0.apiKeyRequirement().needsUserProvidedKey }
+        viewModel.services.filter {
+            !$0.apiKeyRequirement().needsUserProvidedKey && $0.apiKeyRequirement() != .cli
+        }
     }
 
     private var proServices: [QueryService] {
         viewModel.services.filter { $0.apiKeyRequirement().needsUserProvidedKey }
+    }
+
+    private var cliServices: [QueryService] {
+        viewModel.services.filter { $0.apiKeyRequirement() == .cli }
     }
 
     private var freeServicesWithID: [(QueryService, String)] {
@@ -196,6 +218,12 @@ private struct ServiceItems: View {
 
     private var proServicesWithID: [(QueryService, String)] {
         proServices.map { service in
+            (service, service.serviceTypeWithUniqueIdentifier())
+        }
+    }
+
+    private var cliServicesWithID: [(QueryService, String)] {
+        cliServices.map { service in
             (service, service.serviceTypeWithUniqueIdentifier())
         }
     }
