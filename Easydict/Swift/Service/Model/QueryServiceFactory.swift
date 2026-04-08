@@ -79,6 +79,7 @@ final class QueryServiceFactory: NSObject {
         (.builtInAI, BuiltInAIService.self),
         (.claudeCode, ClaudeCodeService.self),
         (.gemini, GeminiService.self),
+        (.claude, ClaudeService.self),
         (.ollama, OllamaService.self),
         (.polishing, PolishingService.self),
         (.summary, SummaryService.self),

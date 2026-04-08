@@ -37,6 +37,7 @@ NSString *const EZServiceTypeMiniMax = @"MiniMax";
 NSString *const EZServiceTypeGitHub = @"GitHub";
 NSString *const EZServiceTypeDoubao = @"Doubao";
 NSString *const EZServiceTypeClaudeCode = @"ClaudeCode";
+NSString *const EZServiceTypeClaude = @"Claude";
 
 NSString *const EZQueryTextTypeKey = @"QueryTextType";
 NSString *const EZIntelligentQueryTextTypeKey = @"IntelligentQueryTextType";
