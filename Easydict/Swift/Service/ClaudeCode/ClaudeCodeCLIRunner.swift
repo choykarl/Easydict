@@ -43,16 +43,26 @@ final class ClaudeCodeCLIRunner {
         return .cliError(message: cleaned)
     }
 
-    /// Runs `claude -p <prompt> --output-format stream-json --include-partial-messages` and
-    /// streams text delta chunks as they arrive.
+    /// Runs `claude -p` with optimised flags and streams text delta chunks as they arrive.
     ///
-    /// The CLI emits one newline-delimited JSON object per event. This method extracts the
-    /// `text_delta` text from each `content_block_delta` event and yields it to the caller,
-    /// giving token-by-token granularity identical to the Anthropic API SSE stream.
+    /// The CLI emits one newline-delimited JSON object per event (`--output-format stream-json`).
+    /// This method extracts `text_delta` text from each `content_block_delta` event, giving
+    /// token-by-token granularity identical to the Anthropic API SSE stream.
     ///
-    /// - Parameter prompt: The fully assembled prompt string.
+    /// Token-reduction flags applied to every invocation:
+    /// - `--system-prompt` — replaces the large Claude Code default system prompt with the
+    ///   caller-supplied translation prompt, skipping all Claude Code tool/agent instructions.
+    /// - `--tools ""` — disables all built-in tools so their descriptions never enter context.
+    /// - `--strict-mcp-config` (without `--mcp-config`) — ignores the user's MCP server config,
+    ///   preventing MCP tool descriptions from entering the context.
+    /// - `--no-session-persistence` — skips session file I/O.
+    ///
+    /// - Parameters:
+    ///   - prompt: The conversation prompt (user / assistant messages only, without system message).
+    ///   - systemPrompt: Passed via `--system-prompt` to replace Claude Code's default system
+    ///     prompt. `nil` omits the flag and leaves Claude Code's default in place.
     /// - Returns: A stream that yields text delta strings as they arrive from the CLI.
-    func run(prompt: String) -> AsyncThrowingStream<String, Error> {
+    func run(prompt: String, systemPrompt: String? = nil) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { [weak self] continuation in
             guard let self else {
                 continuation.finish()
@@ -69,13 +79,19 @@ final class ClaudeCodeCLIRunner {
                     let stderrPipe = Pipe()
 
                     process.executableURL = URL(fileURLWithPath: binaryPath)
-                    process.arguments = [
+                    var arguments = [
                         "-p", prompt,
                         "--output-format", "stream-json",
                         "--include-partial-messages",
                         "--verbose",
                         "--no-session-persistence",
+                        "--tools", "",         // disable all built-in tools
+                        "--strict-mcp-config", // ignore user MCP config; no --mcp-config = no servers
                     ]
+                    if let systemPrompt, !systemPrompt.isEmpty {
+                        arguments += ["--system-prompt", systemPrompt]
+                    }
+                    process.arguments = arguments
                     process.standardOutput = stdoutPipe
                     process.standardError = stderrPipe
                     // Use a neutral working directory so claude does not scan user folders.

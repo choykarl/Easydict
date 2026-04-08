@@ -43,11 +43,15 @@ class ClaudeCodeService: StreamService {
 
     // MARK: Internal
 
-    /// Spawns `claude -p <prompt>` and streams its stdout as raw text chunks.
+    /// Spawns `claude -p` and streams its stdout as text delta chunks.
     ///
     /// The base class `streamTranslate` handles chunk accumulation, `isStreamFinished`,
     /// `getFinalResultText`, and error propagation, so this method only needs to
     /// assemble the prompt and hand the stream to the runner.
+    ///
+    /// The system message is separated from the conversation and passed via `--system-prompt`
+    /// so it replaces Claude Code's default system prompt (which is large and tool-heavy).
+    /// The remaining user/assistant messages are passed as the `-p` prompt.
     override func contentStreamTranslate(
         _ text: String,
         from: Language,
@@ -63,16 +67,32 @@ class ClaudeCodeService: StreamService {
             enableSystemPrompt: true
         )
 
-        // Flatten the structured chat messages into a single prompt string.
-        // `claude -p` accepts a plain-text prompt, so role prefixes serve as
-        // lightweight conversation framing for the few-shot examples.
-        let prompt = chatMessageDicts(chatQueryParam)
+        // Split the message list into a system prompt and a conversation prompt.
+        // The system message goes to `--system-prompt` to replace Claude Code's default
+        // (which loads tool descriptions, hooks, etc.).
+        // User / assistant messages are joined with role prefixes as the `-p` prompt.
+        let messages = chatMessageDicts(chatQueryParam)
+        var systemParts: [String] = []
+        var conversationMessages: [ChatMessage] = []
+        for message in messages {
+            if message.role == .system {
+                systemParts.append(message.content)
+            } else {
+                conversationMessages.append(message)
+            }
+        }
+
+        let systemPrompt = systemParts.joined(separator: "\n\n")
+        let conversationPrompt = conversationMessages
             .map { "\($0.role.rawValue): \($0.content)" }
             .joined(separator: "\n\n")
 
         let currentRunner = ClaudeCodeCLIRunner()
         runner = currentRunner
-        return currentRunner.run(prompt: prompt)
+        return currentRunner.run(
+            prompt: conversationPrompt,
+            systemPrompt: systemPrompt.isEmpty ? nil : systemPrompt
+        )
     }
 
     // MARK: Private
