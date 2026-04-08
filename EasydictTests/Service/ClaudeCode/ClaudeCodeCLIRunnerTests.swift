@@ -11,7 +11,7 @@ import Testing
 
 @Suite("ClaudeCodeCLIRunner")
 struct ClaudeCodeCLIRunnerTests {
-    // MARK: - parseError tests
+    // MARK: - parseError (stderr-only) tests
 
     @Test("parseError returns notLoggedIn when stderr contains 'not logged in'")
     func parseErrorNotLoggedIn() {
@@ -28,13 +28,13 @@ struct ClaudeCodeCLIRunnerTests {
     @Test("parseError returns quotaExceeded when stderr contains 'rate limit'")
     func parseErrorRateLimit() {
         let error = ClaudeCodeRunner.testParseError(from: "rate limit exceeded")
-        #expect(error == .quotaExceeded)
+        #expect(error == .quotaExceeded(message: nil))
     }
 
     @Test("parseError returns quotaExceeded when stderr contains 'usage limit'")
     func parseErrorUsageLimit() {
         let error = ClaudeCodeRunner.testParseError(from: "usage limit reached")
-        #expect(error == .quotaExceeded)
+        #expect(error == .quotaExceeded(message: nil))
     }
 
     @Test("parseError returns cliError for unknown stderr")
@@ -42,6 +42,30 @@ struct ClaudeCodeCLIRunnerTests {
         let message = "something went wrong"
         let error = ClaudeCodeRunner.testParseError(from: message)
         #expect(error == .cliError(message: message))
+    }
+
+    // MARK: - parseError (stdout + stderr) tests
+
+    @Test("parseError detects rate_limit_event in stdout and returns quotaExceeded")
+    func parseErrorRateLimitEventInStdout() {
+        let rateLimitLine = #"{"type":"rate_limit_event","rate_limit_info":{"status":"rejected"}}"#
+        let resultLine = #"{"type":"result","subtype":"success","is_error":true,"result":"You've hit your limit \u00b7 resets 3am","duration_ms":100,"num_turns":1,"total_cost_usd":0,"usage":{},"modelUsage":{}}"#
+        let stdout = rateLimitLine + "\n" + resultLine
+        let error = ClaudeCodeRunner.testParseError(fromStdout: stdout, stderr: "")
+        #expect(error == .quotaExceeded(message: "You've hit your limit · resets 3am"))
+    }
+
+    @Test("parseError returns quotaExceeded with nil message when result text is missing")
+    func parseErrorRateLimitEventNoMessage() {
+        let rateLimitLine = #"{"type":"rate_limit_event","rate_limit_info":{"status":"rejected"}}"#
+        let error = ClaudeCodeRunner.testParseError(fromStdout: rateLimitLine, stderr: "")
+        #expect(error == .quotaExceeded(message: nil))
+    }
+
+    @Test("parseError falls back to stderr when stdout has no rate_limit_event")
+    func parseErrorFallsBackToStderr() {
+        let error = ClaudeCodeRunner.testParseError(fromStdout: "", stderr: "not logged in")
+        #expect(error == .notLoggedIn)
     }
 
     // MARK: - runWhich tests

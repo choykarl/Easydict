@@ -9,7 +9,7 @@
 import SFSafeSymbols
 import SwiftUI
 
-// MARK: - CLIServiceConfigurationView
+// MARK: - AgentCLIServiceConfigurationView
 
 /// Configuration view for CLI-based translation services (e.g. Claude Code).
 ///

@@ -8,7 +8,7 @@
 
 import Foundation
 
-// MARK: - ClaudeCodeCLIRunner
+// MARK: - ClaudeCodeRunner
 
 /// Wraps a `claude -p` subprocess and yields streaming text deltas as an `AsyncThrowingStream<String, Error>`.
 ///
@@ -24,9 +24,35 @@ final class ClaudeCodeRunner {
 
     // MARK: Internal
 
-    /// Parses a `ClaudeCodeError` from stderr content.
-    static func parseError(from stderr: String) -> ClaudeCodeError {
-        // Strip known macOS system noise that is not a real error.
+    /// Parses a `ClaudeCodeError` by inspecting stdout JSON events first, then falling back to stderr.
+    ///
+    /// The Claude Code CLI reports quota / rate-limit failures via a `rate_limit_event` JSON line
+    /// written to **stdout**, accompanied by a `result` line whose `result` field contains the
+    /// human-readable message (e.g. "You've hit your limit · resets 3am"). The stderr at that
+    /// point contains only macOS system noise, so checking stderr alone produces an empty message.
+    static func parseError(fromStdout stdout: String, stderr: String) -> ClaudeCodeError {
+        // 1. Scan stdout for a rate_limit_event — this is the authoritative quota signal.
+        //    Also capture the result message so we can surface the reset-time hint.
+        var hasRateLimitEvent = false
+        var resultMessage: String? = nil
+
+        for line in stdout.components(separatedBy: "\n") where !line.isEmpty {
+            guard let data = line.data(using: .utf8) else { continue }
+            if let event = try? JSONDecoder().decode(CLIStreamJSONLine.self, from: data) {
+                if event.type == "rate_limit_event" {
+                    hasRateLimitEvent = true
+                }
+                if event.type == "result", event.isError == true, let msg = event.result, !msg.isEmpty {
+                    resultMessage = msg
+                }
+            }
+        }
+
+        if hasRateLimitEvent {
+            return .quotaExceeded(message: resultMessage)
+        }
+
+        // 2. Fall back to stderr inspection (authentication errors, unknown CLI failures).
         let cleaned = stderr
             .components(separatedBy: "\n")
             .filter { !$0.contains("MallocStackLogging") }
@@ -38,9 +64,14 @@ final class ClaudeCodeRunner {
             return .notLoggedIn
         }
         if lower.contains("rate limit") || lower.contains("quota") || lower.contains("usage limit") {
-            return .quotaExceeded
+            return .quotaExceeded(message: nil)
         }
         return .cliError(message: cleaned)
+    }
+
+    /// Parses a `ClaudeCodeError` from stderr content only (kept for backward compatibility).
+    static func parseError(from stderr: String) -> ClaudeCodeError {
+        parseError(fromStdout: "", stderr: stderr)
     }
 
     /// Runs `claude -p` with optimised flags and streams text delta chunks as they arrive.
@@ -101,6 +132,8 @@ final class ClaudeCodeRunner {
 
                     let startTime = Date()
                     var stderrBuffer = ""
+                    // Accumulates all stdout text for post-exit error detection.
+                    var stdoutBuffer = ""
                     // Incomplete JSON line carried over between readabilityHandler calls.
                     var lineBuffer = ""
 
@@ -117,6 +150,7 @@ final class ClaudeCodeRunner {
                         let data = handle.availableData
                         guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
                         self?.logger?.appendStdout(text)
+                        stdoutBuffer += text
                         lineBuffer += text
 
                         // Every complete line (all but the last element after splitting on \n)
@@ -135,6 +169,7 @@ final class ClaudeCodeRunner {
                         let remainingStdout = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
                         if let text = String(data: remainingStdout, encoding: .utf8), !text.isEmpty {
                             self?.logger?.appendStdout(text)
+                            stdoutBuffer += text
                             lineBuffer += text
                         }
                         // Process any lines remaining in the buffer.
@@ -158,7 +193,7 @@ final class ClaudeCodeRunner {
                         )
 
                         if exitCode != 0 {
-                            let error = Self.parseError(from: stderrBuffer)
+                            let error = Self.parseError(fromStdout: stdoutBuffer, stderr: stderrBuffer)
                             continuation.finish(throwing: error)
                         } else {
                             continuation.finish()
@@ -274,10 +309,19 @@ final class ClaudeCodeRunner {
 
 /// Outer wrapper for one newline-delimited event from `--output-format stream-json`.
 private struct CLIStreamJSONLine: Decodable {
-    /// Event category (e.g. `"stream_event"`, `"result"`, `"system"`).
+    enum CodingKeys: String, CodingKey {
+        case type, event, result
+        case isError = "is_error"
+    }
+
+    /// Event category (e.g. `"stream_event"`, `"result"`, `"system"`, `"rate_limit_event"`).
     let type: String
     /// Present when `type == "stream_event"`. Contains the inner Anthropic SSE event payload.
     let event: CLIInnerEvent?
+    /// Present when `type == "result"`. Human-readable summary of the completed run.
+    let result: String?
+    /// Present when `type == "result"`. `true` when the run ended with an error.
+    let isError: Bool?
 }
 
 // MARK: - CLIInnerEvent
@@ -449,9 +493,14 @@ final class ClaudeCodeDebugLogger {
 
 #if DEBUG
 extension ClaudeCodeRunner {
-    /// Exposes the private `parseError` method for unit testing.
+    /// Exposes the private `parseError(from:)` method for unit testing.
     static func testParseError(from stderr: String) -> ClaudeCodeError {
         parseError(from: stderr)
+    }
+
+    /// Exposes the private `parseError(fromStdout:stderr:)` method for unit testing.
+    static func testParseError(fromStdout stdout: String, stderr: String) -> ClaudeCodeError {
+        parseError(fromStdout: stdout, stderr: stderr)
     }
 
     /// Exposes the private `runWhich` method for unit testing.

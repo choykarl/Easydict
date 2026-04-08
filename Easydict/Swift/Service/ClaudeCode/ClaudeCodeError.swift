@@ -15,7 +15,8 @@ enum ClaudeCodeError: Error, LocalizedError, Equatable {
     /// The CLI exited with an authentication error.
     case notLoggedIn
     /// The CLI exited with a quota / rate-limit error.
-    case quotaExceeded
+    /// - Parameter message: Optional human-readable message from the CLI (e.g. "You've hit your limit · resets 3am").
+    case quotaExceeded(message: String?)
     /// The CLI exited with a non-zero code for an unrecognised reason.
     case cliError(message: String)
 
@@ -24,13 +25,17 @@ enum ClaudeCodeError: Error, LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .notInstalled:
-            String(localized: "service.claude_code.not_installed")
+            return String(localized: "service.claude_code.not_installed")
         case .notLoggedIn:
-            String(localized: "service.claude_code.not_logged_in")
-        case .quotaExceeded:
-            String(localized: "service.claude_code.quota_exceeded")
+            return String(localized: "service.claude_code.not_logged_in")
+        case let .quotaExceeded(message):
+            let base = String(localized: "service.claude_code.quota_exceeded")
+            if let message, !message.isEmpty {
+                return "\(base)\n\(message)"
+            }
+            return base
         case let .cliError(message):
-            String(localized: "service.claude_code.cli_error \(message)")
+            return String(localized: "service.claude_code.cli_error \(message)")
         }
     }
 }
