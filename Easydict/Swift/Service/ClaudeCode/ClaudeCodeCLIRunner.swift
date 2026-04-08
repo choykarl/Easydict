@@ -10,7 +10,11 @@ import Foundation
 
 // MARK: - ClaudeCodeCLIRunner
 
-/// Wraps a `claude -p` subprocess and yields its stdout as an `AsyncThrowingStream<String, Error>`.
+/// Wraps a `claude -p` subprocess and yields streaming text deltas as an `AsyncThrowingStream<String, Error>`.
+///
+/// Uses `--output-format stream-json --include-partial-messages` so the CLI emits one JSON event
+/// per line. The runner extracts `content_block_delta` text deltas and forwards them to callers,
+/// giving token-by-token granularity identical to the Anthropic API SSE stream.
 ///
 /// Each instance represents exactly one subprocess invocation. Create a new instance per translation request.
 final class ClaudeCodeCLIRunner {
@@ -39,10 +43,15 @@ final class ClaudeCodeCLIRunner {
         return .cliError(message: cleaned)
     }
 
-    /// Runs `claude -p <prompt>` and streams stdout chunks.
+    /// Runs `claude -p <prompt> --output-format stream-json --include-partial-messages` and
+    /// streams text delta chunks as they arrive.
+    ///
+    /// The CLI emits one newline-delimited JSON object per event. This method extracts the
+    /// `text_delta` text from each `content_block_delta` event and yields it to the caller,
+    /// giving token-by-token granularity identical to the Anthropic API SSE stream.
     ///
     /// - Parameter prompt: The fully assembled prompt string.
-    /// - Returns: A stream that yields raw stdout chunks as they arrive.
+    /// - Returns: A stream that yields text delta strings as they arrive from the CLI.
     func run(prompt: String) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { [weak self] continuation in
             guard let self else {
@@ -60,7 +69,13 @@ final class ClaudeCodeCLIRunner {
                     let stderrPipe = Pipe()
 
                     process.executableURL = URL(fileURLWithPath: binaryPath)
-                    process.arguments = ["-p", prompt]
+                    process.arguments = [
+                        "-p", prompt,
+                        "--output-format", "stream-json",
+                        "--include-partial-messages",
+                        "--verbose",
+                        "--no-session-persistence",
+                    ]
                     process.standardOutput = stdoutPipe
                     process.standardError = stderrPipe
                     // Use a neutral working directory so claude does not scan user folders.
@@ -70,6 +85,8 @@ final class ClaudeCodeCLIRunner {
 
                     let startTime = Date()
                     var stderrBuffer = ""
+                    // Incomplete JSON line carried over between readabilityHandler calls.
+                    var lineBuffer = ""
 
                     // Read stderr asynchronously into a buffer.
                     stderrPipe.fileHandleForReading.readabilityHandler = { handle in
@@ -79,20 +96,36 @@ final class ClaudeCodeCLIRunner {
                         }
                     }
 
-                    // Read stdout asynchronously and yield each chunk.
+                    // Read stdout line by line, parse each JSON event, and yield text deltas.
                     stdoutPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
                         let data = handle.availableData
                         guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
                         self?.logger?.appendStdout(text)
-                        continuation.yield(text)
+                        lineBuffer += text
+
+                        // Every complete line (all but the last element after splitting on \n)
+                        // is a full JSON event. The last element is a partial line kept in the buffer.
+                        let lines = lineBuffer.components(separatedBy: "\n")
+                        for line in lines.dropLast() where !line.isEmpty {
+                            if let delta = Self.extractTextDelta(from: line) {
+                                continuation.yield(delta)
+                            }
+                        }
+                        lineBuffer = lines.last ?? ""
                     }
 
                     process.terminationHandler = { [weak self] terminatedProcess in
-                        // Flush remaining data.
+                        // Flush any data that arrived after the last readabilityHandler call.
                         let remainingStdout = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
                         if let text = String(data: remainingStdout, encoding: .utf8), !text.isEmpty {
                             self?.logger?.appendStdout(text)
-                            continuation.yield(text)
+                            lineBuffer += text
+                        }
+                        // Process any lines remaining in the buffer.
+                        for line in lineBuffer.components(separatedBy: "\n") where !line.isEmpty {
+                            if let delta = Self.extractTextDelta(from: line) {
+                                continuation.yield(delta)
+                            }
                         }
 
                         let remainingStderr = stderrPipe.fileHandleForReading.readDataToEndOfFile()
@@ -135,6 +168,23 @@ final class ClaudeCodeCLIRunner {
 
     private var process: Process?
     private var logger: ClaudeCodeLogger?
+
+    /// Parses one newline-delimited JSON line from `--output-format stream-json` output and
+    /// returns the text delta string when the line represents a `content_block_delta` event.
+    ///
+    /// All other event types (system, rate_limit, result, etc.) return `nil` and are skipped.
+    private static func extractTextDelta(from line: String) -> String? {
+        guard let data = line.data(using: .utf8),
+              let wrapper = try? JSONDecoder().decode(CLIStreamJSONLine.self, from: data),
+              wrapper.type == "stream_event",
+              let inner = wrapper.event,
+              inner.type == "content_block_delta",
+              let delta = inner.delta,
+              delta.type == "text_delta",
+              let text = delta.text
+        else { return nil }
+        return text
+    }
 
     /// Returns the path to the first `claude` binary found on this machine.
     ///
@@ -202,6 +252,36 @@ final class ClaudeCodeCLIRunner {
             return nil
         }
     }
+}
+
+// MARK: - CLIStreamJSONLine
+
+/// Outer wrapper for one newline-delimited event from `--output-format stream-json`.
+private struct CLIStreamJSONLine: Decodable {
+    /// Event category (e.g. `"stream_event"`, `"result"`, `"system"`).
+    let type: String
+    /// Present when `type == "stream_event"`. Contains the inner Anthropic SSE event payload.
+    let event: CLIInnerEvent?
+}
+
+// MARK: - CLIInnerEvent
+
+/// The inner Anthropic SSE event re-emitted inside a `stream_event` line.
+private struct CLIInnerEvent: Decodable {
+    /// SSE event type (e.g. `"content_block_delta"`, `"message_start"`).
+    let type: String
+    /// Present for `content_block_delta` events.
+    let delta: CLITextDelta?
+}
+
+// MARK: - CLITextDelta
+
+/// Delta payload for `content_block_delta` events.
+private struct CLITextDelta: Decodable {
+    /// Delta kind — only `"text_delta"` carries translatable content.
+    let type: String
+    /// The incremental text for `text_delta` deltas.
+    let text: String?
 }
 
 // MARK: - ClaudeCodeLogger

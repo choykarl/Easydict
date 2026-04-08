@@ -23,10 +23,12 @@ struct ClaudeCodeServiceTests {
         #expect(service.apiKeyRequirement() == .cli)
     }
 
-    @Test("hasPrivateAPIKey always returns true")
+    @Test("hasPrivateAPIKey returns false when no API key is configured")
     func hasPrivateAPIKey() {
+        // CLI services have no API key; the quota gate is bypassed via .cli requirement,
+        // so hasPrivateAPIKey() is never consulted for access control.
         let service = ClaudeCodeService()
-        #expect(service.hasPrivateAPIKey() == true)
+        #expect(service.hasPrivateAPIKey() == false)
     }
 
     @Test("isStream returns true")
