@@ -38,7 +38,7 @@ class ClaudeCodeService: StreamService {
     }
 
     public override func configurationListItems() -> Any? {
-        CLIServiceConfigurationView(service: self)
+        AgentCLIServiceConfigurationView(service: self)
     }
 
     // MARK: Internal
@@ -87,7 +87,7 @@ class ClaudeCodeService: StreamService {
             .map { "\($0.role.rawValue): \($0.content)" }
             .joined(separator: "\n\n")
 
-        let currentRunner = ClaudeCodeCLIRunner()
+        let currentRunner = ClaudeCodeRunner()
         runner = currentRunner
         return currentRunner.run(
             prompt: conversationPrompt,
@@ -97,5 +97,5 @@ class ClaudeCodeService: StreamService {
 
     // MARK: Private
 
-    private var runner: ClaudeCodeCLIRunner?
+    private var runner: ClaudeCodeRunner?
 }

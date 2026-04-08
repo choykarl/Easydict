@@ -15,7 +15,7 @@ import SwiftUI
 ///
 /// Hides API key, endpoint, model, temperature, and think-tag sections
 /// since they are not applicable to CLI tools.
-struct CLIServiceConfigurationView: View {
+struct AgentCLIServiceConfigurationView: View {
     // MARK: Lifecycle
 
     init(service: StreamService) {
@@ -99,7 +99,7 @@ private struct CLIStatusRow: View {
 
     private func detect() {
         Task.detached(priority: .utility) {
-            let path = ClaudeCodeCLIRunner.detectBinaryPath()
+            let path = ClaudeCodeRunner.detectBinaryPath()
             await MainActor.run { detectedPath = path }
         }
     }

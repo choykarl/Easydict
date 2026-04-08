@@ -15,32 +15,32 @@ struct ClaudeCodeCLIRunnerTests {
 
     @Test("parseError returns notLoggedIn when stderr contains 'not logged in'")
     func parseErrorNotLoggedIn() {
-        let error = ClaudeCodeCLIRunner.testParseError(from: "Error: not logged in")
+        let error = ClaudeCodeRunner.testParseError(from: "Error: not logged in")
         #expect(error == .notLoggedIn)
     }
 
     @Test("parseError returns notLoggedIn when stderr contains 'authentication'")
     func parseErrorAuthentication() {
-        let error = ClaudeCodeCLIRunner.testParseError(from: "authentication failed")
+        let error = ClaudeCodeRunner.testParseError(from: "authentication failed")
         #expect(error == .notLoggedIn)
     }
 
     @Test("parseError returns quotaExceeded when stderr contains 'rate limit'")
     func parseErrorRateLimit() {
-        let error = ClaudeCodeCLIRunner.testParseError(from: "rate limit exceeded")
+        let error = ClaudeCodeRunner.testParseError(from: "rate limit exceeded")
         #expect(error == .quotaExceeded)
     }
 
     @Test("parseError returns quotaExceeded when stderr contains 'usage limit'")
     func parseErrorUsageLimit() {
-        let error = ClaudeCodeCLIRunner.testParseError(from: "usage limit reached")
+        let error = ClaudeCodeRunner.testParseError(from: "usage limit reached")
         #expect(error == .quotaExceeded)
     }
 
     @Test("parseError returns cliError for unknown stderr")
     func parseErrorUnknown() {
         let message = "something went wrong"
-        let error = ClaudeCodeCLIRunner.testParseError(from: message)
+        let error = ClaudeCodeRunner.testParseError(from: message)
         #expect(error == .cliError(message: message))
     }
 
@@ -48,14 +48,14 @@ struct ClaudeCodeCLIRunnerTests {
 
     @Test("runWhich finds /bin/sh which always exists on macOS")
     func runWhichFindsShell() {
-        let path = ClaudeCodeCLIRunner.testRunWhich("sh")
+        let path = ClaudeCodeRunner.testRunWhich("sh")
         #expect(path != nil)
         #expect(path?.contains("/sh") == true)
     }
 
     @Test("runWhich returns nil for a binary that does not exist")
     func runWhichMissingBinary() {
-        let path = ClaudeCodeCLIRunner.testRunWhich("__nonexistent_binary_xyz__")
+        let path = ClaudeCodeRunner.testRunWhich("__nonexistent_binary_xyz__")
         #expect(path == nil)
     }
 }

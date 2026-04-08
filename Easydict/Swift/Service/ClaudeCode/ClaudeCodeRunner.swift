@@ -17,7 +17,7 @@ import Foundation
 /// giving token-by-token granularity identical to the Anthropic API SSE stream.
 ///
 /// Each instance represents exactly one subprocess invocation. Create a new instance per translation request.
-final class ClaudeCodeCLIRunner {
+final class ClaudeCodeRunner {
     // MARK: Lifecycle
 
     init() {}
@@ -448,7 +448,7 @@ final class ClaudeCodeDebugLogger {
 // MARK: - Test Helpers
 
 #if DEBUG
-extension ClaudeCodeCLIRunner {
+extension ClaudeCodeRunner {
     /// Exposes the private `parseError` method for unit testing.
     static func testParseError(from stderr: String) -> ClaudeCodeError {
         parseError(from: stderr)
@@ -461,7 +461,7 @@ extension ClaudeCodeCLIRunner {
 }
 #endif
 
-extension ClaudeCodeCLIRunner {
+extension ClaudeCodeRunner {
     /// Returns the detected `claude` binary path, or `nil` if not found.
     ///
     /// Uses the same login-shell detection as `run(prompt:)`.
