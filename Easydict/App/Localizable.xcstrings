@@ -875,35 +875,6 @@
         }
       }
     },
-    "claude_translate" : {
-      "comment" : "The name of Claude Translate",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Claude Translate"
-          }
-        },
-        "sk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Claude Translate"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Claude 翻译"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Claude 翻譯"
-          }
-        }
-      }
-    },
     "cancel" : {
       "localizations" : {
         "en" : {
@@ -1044,11 +1015,37 @@
         }
       }
     },
-    "Claude Code" : {
-
-    },
     "Claude Code Log" : {
 
+    },
+    "claude_translate" : {
+      "comment" : "The name of Claude Translate",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Translate"
+          }
+        },
+        "sk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Translate"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude 翻译"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude 翻譯"
+          }
+        }
+      }
     },
     "Clear" : {
 
@@ -4785,6 +4782,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "安裝指引"
+          }
+        }
+      }
+    },
+    "service.claude_code.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Code"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Code"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Code"
           }
         }
       }

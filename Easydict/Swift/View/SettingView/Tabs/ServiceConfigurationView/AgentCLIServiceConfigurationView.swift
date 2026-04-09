@@ -69,7 +69,7 @@ private struct CLIStatusRow: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Claude Code")
+                Text("service.claude_code.name")
                     .font(.body)
                 if let path = detectedPath {
                     Text(path)

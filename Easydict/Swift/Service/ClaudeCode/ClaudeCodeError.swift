@@ -35,7 +35,7 @@ enum ClaudeCodeError: Error, LocalizedError, Equatable {
             }
             return base
         case let .cliError(message):
-            return String(localized: "service.claude_code.cli_error \(message)")
+            return String(format: String(localized: "service.claude_code.cli_error %@"), message)
         }
     }
 }
