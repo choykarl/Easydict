@@ -4754,29 +4754,6 @@
         }
       }
     },
-    "service.claude_code.install_guide" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Installation Guide"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "安装指引"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "安裝指引"
-          }
-        }
-      }
-    },
     "service.claude_code.name" : {
       "localizations" : {
         "en" : {

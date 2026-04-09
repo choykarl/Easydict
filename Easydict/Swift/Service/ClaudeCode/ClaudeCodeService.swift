@@ -31,7 +31,7 @@ class ClaudeCodeService: StreamService {
     }
 
     public override func name() -> String {
-        "Claude Code"
+        NSLocalizedString("service.claude_code.name", comment: "The name of Claude Code")
     }
 
     public override func apiKeyRequirement() -> ServiceAPIKeyRequirement {
