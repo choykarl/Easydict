@@ -25,7 +25,7 @@ struct AgentCLIServiceConfigurationView: View {
     // MARK: Internal
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 16) {
             // Status row: show whether the CLI is installed.
             Form {
                 Section {

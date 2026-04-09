@@ -20,6 +20,12 @@ import Foundation
 class ClaudeCodeService: StreamService {
     // MARK: Public
 
+    /// Token usage from the most recent completed translation.
+    ///
+    /// Populated after the stream finishes. `nil` if no translation has completed yet
+    /// or the last request was cancelled / rate-limited before any tokens were consumed.
+    public private(set) var tokenUsage: CLITokenUsage?
+
     public override func serviceType() -> ServiceType {
         .claudeCode
     }
@@ -89,10 +95,37 @@ class ClaudeCodeService: StreamService {
 
         let currentRunner = ClaudeCodeRunner()
         runner = currentRunner
-        return currentRunner.run(
+        let baseStream = currentRunner.run(
             prompt: conversationPrompt,
             systemPrompt: systemPrompt.isEmpty ? nil : systemPrompt
         )
+
+        // Wrap the stream to capture token usage and, in DEBUG builds, append a
+        // usage summary as a final text chunk so it gets accumulated into the
+        // translation result naturally (getFinalResultText runs after the stream
+        // ends and the result is already frozen, so a trailing chunk is the only
+        // reliable way to inject content).
+        return AsyncThrowingStream { [weak self] continuation in
+            Task {
+                do {
+                    for try await chunk in baseStream {
+                        continuation.yield(chunk)
+                    }
+                    self?.tokenUsage = currentRunner.tokenUsage
+                    #if DEBUG
+                    if let usage = currentRunner.tokenUsage {
+                        continuation.yield(
+                            "\n\n↳ in \(usage.inputTokens) · cache-write \(usage.cacheCreationInputTokens) · cache-read \(usage.cacheReadInputTokens) · out \(usage.outputTokens)"
+                        )
+                    }
+                    #endif
+                    continuation.finish()
+                } catch {
+                    self?.tokenUsage = currentRunner.tokenUsage
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
     }
 
     // MARK: Private
