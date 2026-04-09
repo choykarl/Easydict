@@ -8603,6 +8603,34 @@
         }
       }
     },
+    "setting.service.section.agent_cli" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agent CLI"
+          }
+        },
+        "sk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agent CLI"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agent CLI"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agent CLI"
+          }
+        }
+      }
+    },
     "setting.service.section.free" : {
       "localizations" : {
         "en" : {
