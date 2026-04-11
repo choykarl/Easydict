@@ -244,16 +244,27 @@ final class ClaudeCodeRunner: @unchecked Sendable {
 
     // MARK: Private
 
+    /// Cached path from the first successful `detectClaudeBinary()` call.
+    /// Avoids spawning a login shell on every translation request.
+    private static var cachedBinaryPath: String?
+
     private var process: Process?
     private var logger: ClaudeCodeLogger?
 
     /// Returns the path to the first `claude` binary found on this machine.
     ///
+    /// The result is cached after the first successful lookup so the login-shell
+    /// invocation only happens once per app session.
+    ///
     /// - Throws: `ClaudeCodeError.notInstalled` if no binary is found.
     private static func detectClaudeBinary() throws -> String {
+        if let cached = cachedBinaryPath {
+            return cached
+        }
         // 1. Try via login shell so PATH from ~/.zshrc / ~/.bash_profile is available.
         //    GUI apps do not inherit the user's shell PATH, so a plain `which` call fails.
         if let path = runViaLoginShell("which claude") {
+            cachedBinaryPath = path
             return path
         }
         // 2. Check common manual-install locations as fallback.
@@ -264,6 +275,7 @@ final class ClaudeCodeRunner: @unchecked Sendable {
             "/opt/homebrew/bin/claude",
         ]
         for candidate in candidates where FileManager.default.isExecutableFile(atPath: candidate) {
+            cachedBinaryPath = candidate
             return candidate
         }
         throw ClaudeCodeError.notInstalled
