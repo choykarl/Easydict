@@ -143,6 +143,15 @@ public class StreamService: QueryService {
                         continuation.yield(result)
                     }
                     continuation.finish()
+                } catch is CancellationError {
+                    let cancellationResult = self.result ?? QueryResult()
+                    if self.result == nil {
+                        self.result = cancellationResult
+                    }
+                    cancellationResult.isStreamFinished = true
+                    cancellationResult.error = nil
+                    continuation.yield(cancellationResult)
+                    continuation.finish()
                 } catch {
                     if !didYieldError {
                         let errorResult = self.result ?? QueryResult()

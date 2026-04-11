@@ -60,12 +60,12 @@ extension StreamService {
                         updateResultText(resultText, queryType: queryType, error: nil) { result in
                             continuation.yield(result)
                         }
+                        continuation.finish()
                     } else {
-                        // `updateResultText` treats empty text + finished stream as `.noResult`;
-                        // yield a clean terminal result so stream consumers still get one callback.
-                        continuation.yield(result)
+                        // The outer pipeline only forwards results with translated text, so an
+                        // empty terminal result would be dropped before UI consumers see it.
+                        continuation.finish(throwing: CancellationError())
                     }
-                    continuation.finish()
                     return
                 } catch {
                     // Handle non-cancellation errors and notify the user.
