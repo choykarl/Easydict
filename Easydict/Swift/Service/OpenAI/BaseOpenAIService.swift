@@ -212,24 +212,21 @@ public class BaseOpenAIService: StreamService {
         -> AsyncThrowingStream<String, Error> {
         let apiKey = apiKey
 
-        return AsyncThrowingStream { [weak self] continuation in
+        return AsyncThrowingStream(String.self) { [weak self] continuation in
+            guard let self else {
+                continuation.finish(throwing: CancellationError())
+                return
+            }
+
             let task = Task {
-                defer { self?.nonStreamingTask = nil }
+                defer { self.nonStreamingTask = nil }
 
                 do {
-                    var query = query
-                    query.stream = false
-
-                    var request = URLRequest(url: url, timeoutInterval: EZNetWorkTimeoutInterval)
-                    request.httpMethod = "POST"
-                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                    if !apiKey.isEmpty {
-                        request.setValue(
-                            "Bearer \(apiKey)", forHTTPHeaderField: "Authorization"
-                        )
-                    }
-                    request.httpBody = try JSONEncoder().encode(query)
-
+                    let request = try self.makeNonStreamingChatRequest(
+                        query: query,
+                        url: url,
+                        apiKey: apiKey
+                    )
                     let (data, response) = try await URLSession.shared.data(for: request)
                     try Task.checkCancellation()
 
@@ -268,10 +265,36 @@ public class BaseOpenAIService: StreamService {
                 }
             }
 
-            self?.nonStreamingTask = task
+            nonStreamingTask = task
             continuation.onTermination = { @Sendable _ in
                 task.cancel()
             }
         }
+    }
+
+    /// Builds the HTTP request for a non-streaming OpenAI-compatible chat completion.
+    /// - Parameters:
+    ///   - query: The chat completion query to encode.
+    ///   - url: The provider endpoint URL.
+    ///   - apiKey: The API token used by OpenAI-compatible providers.
+    /// - Returns: A configured `URLRequest` ready for `URLSession`.
+    private func makeNonStreamingChatRequest(
+        query: ChatQuery,
+        url: URL,
+        apiKey: String
+    ) throws
+        -> URLRequest {
+        var query = query
+        query.stream = false
+
+        var request = URLRequest(url: url, timeoutInterval: EZNetWorkTimeoutInterval)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if !apiKey.isEmpty {
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            request.setValue(apiKey, forHTTPHeaderField: "api-key")
+        }
+        request.httpBody = try JSONEncoder().encode(query)
+        return request
     }
 }
