@@ -86,6 +86,9 @@ final class ClaudeCodeService: StreamService {
             .map { "\($0.role.rawValue): \($0.content)" }
             .joined(separator: "\n\n")
 
+        // Cancel any in-flight runner before replacing it so the previous subprocess
+        // does not continue consuming CPU/quota after a new request starts.
+        runner?.cancel()
         let currentRunner = ClaudeCodeRunner()
         runner = currentRunner
         let baseStream = currentRunner.run(

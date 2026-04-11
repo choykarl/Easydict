@@ -155,6 +155,23 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                         stdoutPipe.fileHandleForReading.readabilityHandler = nil
                         stderrPipe.fileHandleForReading.readabilityHandler = nil
 
+                        // Drain all readabilityHandler blocks already queued on ioQueue before
+                        // we read remaining pipe data or enqueue the finish block.
+                        //
+                        // Race: a readabilityHandler fires on the OS thread, captures
+                        // `data = handle.availableData` (consuming those bytes from the pipe),
+                        // then calls ioQueue.async. If that ioQueue.async happens AFTER we
+                        // enqueue the termination finish block, the handler's data is processed
+                        // after finish() — yielded text is silently dropped, and the result/
+                        // usage line may miss parseTokenUsage / parseError.
+                        //
+                        // Mitigation: sync-wait on ioQueue to flush any blocks already queued,
+                        // then read remaining pipe bytes (a syscall). Any readabilityHandler
+                        // that was executing during the nil above has microseconds to reach its
+                        // own ioQueue.async — that enqueue happens before our subsequent
+                        // ioQueue.async { finish }, preserving FIFO order.
+                        Self.ioQueue.sync {}
+
                         // Capture isCancelled by value NOW under stateLock, while self may still exist.
                         // ClaudeCodeService.cancelStream() sets runner = nil immediately, so
                         // self can be deallocated before ioQueue.async runs, making
