@@ -16,7 +16,8 @@ import SwiftUI
 
 /// Manages the floating debug log panel for Claude Code CLI output.
 ///
-/// Open with ⌘⇧L from the Debug menu (visible only in DEBUG builds).
+/// Open via the "Show Debug Log Window" button in the Claude Code service settings.
+/// Visible only in AGENT_CLI_DEBUG builds.
 final class ClaudeCodeDebugWindowController: NSWindowController {
     // MARK: Lifecycle
 

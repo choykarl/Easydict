@@ -122,14 +122,16 @@ class ClaudeCodeService: StreamService {
                     continuation.finish()
                 } catch {
                     self?.tokenUsage = currentRunner.tokenUsage
-                    // Wrap ClaudeCodeError in QueryError so its LocalizedError.errorDescription
-                    // is preserved. QueryError.queryError(from:) falls back to String(describing:)
-                    // for unknown error types, which shows raw enum text instead of the
-                    // user-facing message defined in ClaudeCodeError.errorDescription.
-                    let queryError = QueryError.queryError(from: error) ?? QueryError(
-                        type: .api,
-                        message: error.localizedDescription
-                    )
+                    // Preserve LocalizedError.errorDescription for ClaudeCodeError.
+                    // QueryError.queryError(from:) uses String(describing:) as a fallback,
+                    // which shows raw enum text. Cast first; only use localizedDescription
+                    // (which calls errorDescription) when the error is not already a QueryError.
+                    let queryError: QueryError
+                    if let qe = error as? QueryError {
+                        queryError = qe
+                    } else {
+                        queryError = QueryError(type: .api, message: error.localizedDescription)
+                    }
                     continuation.finish(throwing: queryError)
                 }
             }

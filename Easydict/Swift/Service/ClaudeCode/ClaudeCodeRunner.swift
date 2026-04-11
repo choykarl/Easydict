@@ -329,7 +329,14 @@ final class ClaudeCodeRunner: @unchecked Sendable {
     ///
     /// Uses `-l` (login) so the shell sources the user's profile and picks up their full PATH.
     private static func runViaLoginShell(_ command: String) -> String? {
-        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        // Validate SHELL against known shells before using it as an executable path.
+        // An attacker-controlled SHELL value could otherwise run arbitrary binaries.
+        let knownShells: Set<String> = [
+            "/bin/sh", "/bin/bash", "/bin/zsh",
+            "/usr/bin/bash", "/usr/bin/zsh",
+        ]
+        let envShell = ProcessInfo.processInfo.environment["SHELL"] ?? ""
+        let shell = knownShells.contains(envShell) ? envShell : "/bin/zsh"
         let process = Process()
         let pipe = Pipe()
         process.executableURL = URL(fileURLWithPath: shell)
