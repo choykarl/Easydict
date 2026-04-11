@@ -249,8 +249,19 @@ private struct ServiceItems: View {
             }
         }
 
-        // Find destination index in full services array
-        let actualDestination = sectionToFullIndexMap[destination] ?? destination
+        // Find destination index in full services array.
+        // When destination == sectionServices.count the user is dropping at the end of the section.
+        // There is no map entry for that index, so derive it from the last section item's full
+        // index + 1 instead of falling back to the raw section-relative value.
+        let actualDestination: Int
+        if let mapped = sectionToFullIndexMap[destination] {
+            actualDestination = mapped
+        } else if destination == sectionServices.count,
+                  let lastFullIndex = sectionToFullIndexMap[destination - 1] {
+            actualDestination = lastFullIndex + 1
+        } else {
+            actualDestination = destination
+        }
 
         viewModel.onServiceItemMove(fromOffsets: actualSourceIndices, toOffset: actualDestination)
     }
