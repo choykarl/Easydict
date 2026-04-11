@@ -107,50 +107,64 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                     self?.process = process
 
                     let startTime = Date()
-                    var stderrBuffer = ""
+                    // Raw stderr bytes; decoded to String once in the termination handler
+                    // after all data has arrived, so multi-byte UTF-8 sequences are never split.
+                    var stderrDataBuffer = Data()
                     // Accumulates only non-delta stdout lines for post-exit error/usage detection.
                     // Excludes content_block_delta events to bound memory usage.
                     var stdoutControlBuffer = ""
-                    // Incomplete JSON line carried over between readabilityHandler calls.
-                    var lineBuffer = ""
+                    // Incomplete stdout bytes carried over between readabilityHandler calls.
+                    // Buffered at the Data level so multi-byte UTF-8 chars split across reads
+                    // are not dropped when converting to String.
+                    var stdoutDataBuffer = Data()
 
-                    // Read stderr asynchronously into a buffer (capped at 1 MB).
+                    // Read stderr asynchronously into a raw-byte buffer (capped at 1 MB).
+                    // Decoding is deferred to the termination handler so that multi-byte UTF-8
+                    // characters split across availableData reads are never silently dropped.
                     stderrPipe.fileHandleForReading.readabilityHandler = { handle in
                         let data = handle.availableData
-                        guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
+                        guard !data.isEmpty else { return }
                         Self.ioQueue.async {
                             let maxSize = 1_048_576 // 1 MB
-                            if stderrBuffer.utf8.count + text.utf8.count <= maxSize {
-                                stderrBuffer += text
+                            if stderrDataBuffer.count + data.count <= maxSize {
+                                stderrDataBuffer.append(data)
                             } else {
-                                stderrBuffer = String((stderrBuffer + text).suffix(maxSize))
+                                let combined = stderrDataBuffer + data
+                                stderrDataBuffer = Data(combined.suffix(maxSize))
                             }
                         }
                     }
 
                     // Read stdout line by line, parse each JSON event, and yield text deltas.
                     // Only non-delta lines are kept in stdoutControlBuffer for error/usage parsing.
+                    // Buffers raw Data and splits on the newline byte (0x0A) so that multi-byte
+                    // UTF-8 characters cut across two availableData reads are never dropped.
                     stdoutPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
                         let data = handle.availableData
-                        guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
+                        guard !data.isEmpty else { return }
                         let capturedLogger = self?.logger
                         Self.ioQueue.async {
-                            capturedLogger?.appendStdout(text)
-                            lineBuffer += text
+                            capturedLogger?.appendStdout(String(data: data, encoding: .utf8) ?? "")
+                            stdoutDataBuffer.append(data)
 
-                            // Every complete line (all but the last element after splitting on \n)
-                            // is a full JSON event. The last element is a partial line kept in the buffer.
-                            let lines = lineBuffer.components(separatedBy: "\n")
-                            for line in lines.dropLast() where !line.isEmpty {
-                                if let delta = extractTextDelta(from: line, decoder: decoder) {
-                                    continuation.yield(delta)
-                                } else {
-                                    // Retain control events (result, rate_limit_event, system) for
-                                    // post-exit error detection and token-usage parsing.
-                                    stdoutControlBuffer += line + "\n"
+                            // Consume all complete newline-terminated lines from the data buffer.
+                            // Splitting on the 0x0A byte is safe because newline is a single byte
+                            // in UTF-8; multi-byte sequences never contain 0x0A.
+                            while let idx = stdoutDataBuffer.firstIndex(of: 0x0A) {
+                                let lineData = stdoutDataBuffer[..<idx]
+                                if let line = String(data: lineData, encoding: .utf8), !line.isEmpty {
+                                    if let delta = extractTextDelta(from: line, decoder: decoder) {
+                                        continuation.yield(delta)
+                                    } else {
+                                        // Retain control events (result, rate_limit_event, system) for
+                                        // post-exit error detection and token-usage parsing.
+                                        stdoutControlBuffer += line + "\n"
+                                    }
                                 }
+                                stdoutDataBuffer = Data(
+                                    stdoutDataBuffer[stdoutDataBuffer.index(after: idx)...]
+                                )
                             }
-                            lineBuffer = lines.last ?? ""
                         }
                     }
 
@@ -175,13 +189,30 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                         let capturedLogger = self?.logger
 
                         Self.ioQueue.async { [weak self] in
-                            if let text = String(data: remainingStdoutData, encoding: .utf8), !text.isEmpty {
-                                capturedLogger?.appendStdout(text)
-                                lineBuffer += text
+                            if !remainingStdoutData.isEmpty {
+                                capturedLogger?
+                                    .appendStdout(String(data: remainingStdoutData, encoding: .utf8) ?? "")
+                                stdoutDataBuffer.append(remainingStdoutData)
                             }
 
-                            // Process any lines remaining in the line buffer.
-                            for line in lineBuffer.components(separatedBy: "\n") where !line.isEmpty {
+                            // Flush all remaining newline-terminated lines from the data buffer.
+                            while let idx = stdoutDataBuffer.firstIndex(of: 0x0A) {
+                                let lineData = stdoutDataBuffer[..<idx]
+                                if let line = String(data: lineData, encoding: .utf8), !line.isEmpty {
+                                    if let delta = extractTextDelta(from: line, decoder: decoder) {
+                                        continuation.yield(delta)
+                                    } else {
+                                        stdoutControlBuffer += line + "\n"
+                                    }
+                                }
+                                stdoutDataBuffer = Data(
+                                    stdoutDataBuffer[stdoutDataBuffer.index(after: idx)...]
+                                )
+                            }
+                            // Handle any data remaining without a trailing newline.
+                            if !stdoutDataBuffer.isEmpty,
+                               let line = String(data: stdoutDataBuffer, encoding: .utf8),
+                               !line.isEmpty {
                                 if let delta = extractTextDelta(from: line, decoder: decoder) {
                                     continuation.yield(delta)
                                 } else {
@@ -189,14 +220,17 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                                 }
                             }
 
-                            if let text = String(data: remainingStderrData, encoding: .utf8), !text.isEmpty {
+                            if !remainingStderrData.isEmpty {
                                 let maxSize = 1_048_576
-                                if stderrBuffer.utf8.count + text.utf8.count <= maxSize {
-                                    stderrBuffer += text
+                                if stderrDataBuffer.count + remainingStderrData.count <= maxSize {
+                                    stderrDataBuffer.append(remainingStderrData)
                                 } else {
-                                    stderrBuffer = String((stderrBuffer + text).suffix(maxSize))
+                                    let combined = stderrDataBuffer + remainingStderrData
+                                    stderrDataBuffer = Data(combined.suffix(maxSize))
                                 }
                             }
+                            // Decode the complete stderr buffer now that all bytes have arrived.
+                            let stderrBuffer = String(data: stderrDataBuffer, encoding: .utf8) ?? ""
 
                             let duration = Date().timeIntervalSince(startTime)
                             capturedLogger?.finish(stderr: stderrBuffer, exitCode: exitCode, duration: duration)
