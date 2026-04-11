@@ -31,6 +31,14 @@ public class BaseOpenAIService: StreamService {
 
     typealias OpenAIChatMessage = ChatQuery.ChatCompletionMessageParam
 
+    /// Whether the current request should use streaming transport.
+    ///
+    /// Validation may temporarily override the persisted toggle so transport choice must read
+    /// from the effective runtime state instead of the stored configuration alone.
+    override var usesStreamingTransport: Bool {
+        streamingOverride ?? enableStreaming
+    }
+
     let control = StreamControl()
 
     override func contentStreamTranslate(
@@ -82,8 +90,7 @@ public class BaseOpenAIService: StreamService {
 
         let query = ChatQuery(messages: chatHistory, model: model, temperature: temperature)
 
-        let useStreaming = streamingOverride ?? enableStreaming
-        if useStreaming {
+        if usesStreamingTransport {
             let openAI = OpenAI(apiToken: apiKey)
 
             // FIXME: It seems that `control` will cause a memory leak, but it is not clear how to solve it.
