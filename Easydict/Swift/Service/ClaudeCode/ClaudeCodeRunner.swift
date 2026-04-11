@@ -395,7 +395,14 @@ final class ClaudeCodeRunner: @unchecked Sendable {
         process.executableURL = URL(fileURLWithPath: shell)
         process.arguments = ["-l", "-c", command]
         process.standardOutput = pipe
-        process.standardError = Pipe() // suppress stderr
+        // Redirect stderr to /dev/null instead of an unread Pipe().
+        // Login shell profile scripts can emit large amounts of output to stderr (e.g. from
+        // sourced tools like nvm, rbenv, or homebrew init). An unread Pipe() has a fixed OS
+        // buffer (~64 KB); once full, the child process blocks on write(), causing
+        // waitUntilExit() to hang indefinitely and preventing binary detection from completing.
+        // Fall back to a Pipe() if /dev/null cannot be opened (e.g. sandbox restrictions),
+        // accepting the theoretical buffer-full hang rather than crashing with nil.
+        process.standardError = FileHandle(forWritingAtPath: "/dev/null") ?? Pipe()
         do {
             try process.run()
             process.waitUntilExit()
