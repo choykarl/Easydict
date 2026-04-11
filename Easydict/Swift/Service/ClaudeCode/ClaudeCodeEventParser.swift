@@ -91,10 +91,10 @@ func parseTokenUsage(from stdout: String) -> CLITokenUsage? {
         else { continue }
 
         return CLITokenUsage(
-            inputTokens: usage.inputTokens,
-            cacheCreationInputTokens: usage.cacheCreationInputTokens,
-            cacheReadInputTokens: usage.cacheReadInputTokens,
-            outputTokens: usage.outputTokens,
+            inputTokens: usage.inputTokens ?? 0,
+            cacheCreationInputTokens: usage.cacheCreationInputTokens ?? 0,
+            cacheReadInputTokens: usage.cacheReadInputTokens ?? 0,
+            outputTokens: usage.outputTokens ?? 0,
             totalCostUSD: event.totalCostUSD ?? 0,
             durationMs: event.durationMs ?? 0
         )
@@ -149,6 +149,10 @@ private struct CLIStreamJSONLine: Decodable {
 // MARK: - CLIRawUsage
 
 /// Raw usage fields decoded from the `result` event.
+///
+/// All fields are optional because the CLI may send `"usage": {}` on error payloads
+/// (e.g. rate-limit events where no tokens were consumed). Using optional fields prevents
+/// a decode failure from silently swallowing the quota message in the `result` field.
 private struct CLIRawUsage: Decodable {
     enum CodingKeys: String, CodingKey {
         case inputTokens = "input_tokens"
@@ -157,10 +161,10 @@ private struct CLIRawUsage: Decodable {
         case outputTokens = "output_tokens"
     }
 
-    let inputTokens: Int
-    let cacheCreationInputTokens: Int
-    let cacheReadInputTokens: Int
-    let outputTokens: Int
+    let inputTokens: Int?
+    let cacheCreationInputTokens: Int?
+    let cacheReadInputTokens: Int?
+    let outputTokens: Int?
 }
 
 // MARK: - CLIInnerEvent
