@@ -39,10 +39,17 @@ extension StreamService {
         }
     }
 
+    /// Update the result text and optionally mark the stream as finished in one atomic operation.
+    ///
+    /// - Parameter markStreamFinished: When `true`, sets `result.isStreamFinished = true` inside
+    ///   the lock before updating `translatedResults`. This prevents a race where a throttled
+    ///   delivery of an earlier accumulated snapshot overwrites the final value after
+    ///   `isStreamFinished` has been set outside the lock.
     func updateResultText(
         _ resultText: String?,
         queryType: EZQueryTextType,
         error: Error?,
+        markStreamFinished: Bool = false,
         completion: @escaping (QueryResult) -> ()
     ) {
         // Acquire the lock before accessing/modifying the shared 'result' state
@@ -72,8 +79,9 @@ extension StreamService {
             return
         }
 
-        // If error is not nil, means stream is finished.
-        result.isStreamFinished = error != nil
+        // Mark the stream as finished atomically inside the lock so that concurrent
+        // throttle deliveries of stale snapshots cannot overwrite the final value.
+        result.isStreamFinished = markStreamFinished || (error != nil)
 
         var finalText = resultText?.trim() ?? ""
 
