@@ -75,7 +75,10 @@ func parseError(fromStdout stdout: String, stderr: String) -> ClaudeCodeError {
     if lower.contains("rate limit") || lower.contains("quota") || lower.contains("usage limit") {
         return .quotaExceeded(message: nil)
     }
-    return .cliError(message: cleaned)
+    // Use the cleaned stderr text if available; fall back to a generic message so the
+    // caller never receives an empty string that gives the user no actionable information.
+    let message = cleaned.isEmpty ? "Unknown CLI error (exit code non-zero)" : cleaned
+    return .cliError(message: message)
 }
 
 /// Scans stdout for the `result` event and extracts token usage.
