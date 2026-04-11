@@ -82,7 +82,9 @@ final class ClaudeCodeRunner: @unchecked Sendable {
             Task {
                 do {
                     let binaryPath = try Self.detectClaudeBinary()
+                    #if AGENT_CLI_DEBUG
                     self.logger = ClaudeCodeLogger(command: "\(binaryPath) -p <prompt>", prompt: prompt)
+                    #endif
 
                     let process = Process()
                     let stdoutPipe = Pipe()
@@ -93,12 +95,14 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                         "-p", prompt,
                         "--output-format", "stream-json",
                         "--include-partial-messages",
-                        "--verbose",
                         "--no-session-persistence",
                         "--tools", "", // disable all built-in tools
                         "--strict-mcp-config", // ignore user MCP config; no --mcp-config = no servers
                         "--setting-sources", "", // skip all settings files to prevent plugin hooks
                     ]
+                    #if AGENT_CLI_DEBUG
+                    arguments.append("--verbose")
+                    #endif
                     if let systemPrompt, !systemPrompt.isEmpty {
                         arguments += ["--system-prompt", systemPrompt]
                     }
