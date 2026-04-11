@@ -27,7 +27,7 @@ final class ClaudeCodeDebugWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        panel.title = "Claude Code Debug Log"
+        panel.title = String(localized: "service.claude_code.debug_log.window_title")
         panel.level = .floating
         panel.isReleasedWhenClosed = false
         panel.center()

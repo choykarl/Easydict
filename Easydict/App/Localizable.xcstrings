@@ -4960,6 +4960,35 @@
         }
       }
     },
+    "service.claude_code.debug_log.window_title" : {
+      "comment" : "Title of the Claude Code debug log panel",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Code Debug Log"
+          }
+        },
+        "sk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Debug log Claude Code"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Code 调试日志"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Code 調試日誌"
+          }
+        }
+      }
+    },
     "service.configuration.ali.access_key_id.title" : {
       "localizations" : {
         "en" : {
