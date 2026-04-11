@@ -138,9 +138,30 @@ struct ClaudeCodeCLIRunnerTests {
         #expect(usage == nil)
     }
 
-    @Test("parseTokenUsage returns nil for empty input")
-    func parseTokenUsageReturnsNilForEmpty() {
-        let usage = parseTokenUsage(from: "")
+    @Test("parseTokenUsage returns nil when result usage payload has no token fields")
+    func parseTokenUsageReturnsNilForEmptyUsagePayload() {
+        let line =
+            #"{"type":"result","subtype":"success","is_error":true,"result":"rate limited","# +
+            #""duration_ms":100,"num_turns":1,"total_cost_usd":0,"usage":{},"modelUsage":{}}"#
+        let usage = parseTokenUsage(from: line)
         #expect(usage == nil)
+    }
+
+    @Test("resolveLoginShellPath accepts executable non-zsh login shells")
+    func resolveLoginShellPathAcceptsExecutableNonZshShell() {
+        let shell = ClaudeCodeRunner.resolveLoginShellPath(environmentShell: "/bin/sh")
+        #expect(shell == "/bin/sh")
+    }
+
+    @Test("resolveLoginShellPath falls back for non-absolute shell values")
+    func resolveLoginShellPathFallsBackForNonAbsoluteShell() {
+        let shell = ClaudeCodeRunner.resolveLoginShellPath(environmentShell: "fish")
+        #expect(shell == "/bin/zsh")
+    }
+
+    @Test("resolveLoginShellPath falls back for non-executable absolute paths")
+    func resolveLoginShellPathFallsBackForNonExecutableAbsolutePath() {
+        let shell = ClaudeCodeRunner.resolveLoginShellPath(environmentShell: "/tmp/not-a-shell")
+        #expect(shell == "/bin/zsh")
     }
 }

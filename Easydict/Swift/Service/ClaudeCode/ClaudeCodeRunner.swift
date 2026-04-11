@@ -432,18 +432,25 @@ final class ClaudeCodeRunner: @unchecked Sendable {
         throw ClaudeCodeError.notInstalled
     }
 
+    /// Resolves which shell executable should run login-shell detection.
+    ///
+    /// Accepts the user's configured shell when it is an absolute executable path,
+    /// and otherwise falls back to `/bin/zsh`.
+    static func resolveLoginShellPath(environmentShell: String?) -> String {
+        guard let environmentShell,
+              environmentShell.hasPrefix("/"),
+              FileManager.default.isExecutableFile(atPath: environmentShell)
+        else {
+            return "/bin/zsh"
+        }
+        return environmentShell
+    }
+
     /// Runs a command via the user's login shell, returning trimmed stdout or nil on failure.
     ///
     /// Uses `-l` (login) so the shell sources the user's profile and picks up their full PATH.
     private static func runViaLoginShell(_ command: String) -> String? {
-        // Validate SHELL against known shells before using it as an executable path.
-        // An attacker-controlled SHELL value could otherwise run arbitrary binaries.
-        let knownShells: Set<String> = [
-            "/bin/sh", "/bin/bash", "/bin/zsh",
-            "/usr/bin/bash", "/usr/bin/zsh",
-        ]
-        let envShell = ProcessInfo.processInfo.environment["SHELL"] ?? ""
-        let shell = knownShells.contains(envShell) ? envShell : "/bin/zsh"
+        let shell = resolveLoginShellPath(environmentShell: ProcessInfo.processInfo.environment["SHELL"])
         let process = Process()
         let pipe = Pipe()
         process.executableURL = URL(fileURLWithPath: shell)

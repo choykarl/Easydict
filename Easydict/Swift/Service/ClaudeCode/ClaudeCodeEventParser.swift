@@ -93,6 +93,12 @@ func parseTokenUsage(from stdout: String) -> CLITokenUsage? {
               let usage = event.usage
         else { continue }
 
+        let hasAnyTokenField = usage.inputTokens != nil
+            || usage.cacheCreationInputTokens != nil
+            || usage.cacheReadInputTokens != nil
+            || usage.outputTokens != nil
+        guard hasAnyTokenField else { return nil }
+
         return CLITokenUsage(
             inputTokens: usage.inputTokens ?? 0,
             cacheCreationInputTokens: usage.cacheCreationInputTokens ?? 0,
