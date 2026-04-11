@@ -241,6 +241,13 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                     }
                     try process.run()
                     self?.logger?.start()
+                    // Post-launch cancellation guard: cancel() checks isRunning before calling
+                    // terminate(), so if cancel() ran between setProcessIfNotCancelled and run()
+                    // it would have skipped terminate() (isRunning was false at that point).
+                    // Now that the process is running, terminate it if cancellation was requested.
+                    if self?.checkIsCancelled() == true, process.isRunning {
+                        process.terminate()
+                    }
                 } catch {
                     continuation.finish(throwing: error)
                 }

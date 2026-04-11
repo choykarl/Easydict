@@ -6,6 +6,7 @@
 //  Copyright © 2026 izual. All rights reserved.
 //
 
+import Defaults
 import Foundation
 
 // MARK: - ClaudeCodeService
@@ -19,6 +20,15 @@ import Foundation
 @objc(EZClaudeCodeService)
 final class ClaudeCodeService: StreamService {
     // MARK: Public
+
+    /// Claude Code has no API key, endpoint, or model fields to observe.
+    ///
+    /// Returning an empty array prevents `ServiceValidationViewModel` from treating
+    /// empty key/endpoint/model values as "missing input", which would permanently
+    /// disable the Validate button in the settings UI.
+    public override var observeKeys: [Defaults.Key<String>] {
+        []
+    }
 
     /// Token usage from the most recent completed translation.
     ///
