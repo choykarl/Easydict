@@ -33,7 +33,7 @@ struct AgentCLIServiceConfigurationView: View {
                 }
                 #if AGENT_CLI_DEBUG
                 Section {
-                    Button("Show Debug Log Window") {
+                    Button("service.claude_code.debug_log.show_window") {
                         ClaudeCodeDebugWindowController.shared.toggle()
                     }
                 }

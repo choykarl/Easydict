@@ -104,8 +104,8 @@ private struct ClaudeCodeDebugView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Button("Clear") { viewModel.clear() }
-                Button("Show in Finder") { viewModel.showInFinder() }
+                Button("service.claude_code.debug_log.clear") { viewModel.clear() }
+                Button("service.claude_code.debug_log.show_in_finder") { viewModel.showInFinder() }
                 Spacer()
             }
             .padding(8)
