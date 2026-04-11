@@ -84,4 +84,55 @@ struct ClaudeCodeCLIRunnerTests {
         let path = ClaudeCodeRunner.runWhich("__nonexistent_binary_xyz__")
         #expect(path == nil)
     }
+
+    // MARK: - extractTextDelta tests
+
+    @Test("extractTextDelta returns text for a valid content_block_delta line")
+    func extractTextDeltaReturnsText() {
+        let line = #"{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}}"#
+        let result = extractTextDelta(from: line)
+        #expect(result == "Hello")
+    }
+
+    @Test("extractTextDelta returns nil for a non-delta event type")
+    func extractTextDeltaIgnoresNonDelta() {
+        let line = #"{"type":"result","subtype":"success","is_error":false,"result":"ok","duration_ms":500,"num_turns":1,"total_cost_usd":0.001,"usage":{"input_tokens":10,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":5},"modelUsage":{}}"#
+        let result = extractTextDelta(from: line)
+        #expect(result == nil)
+    }
+
+    @Test("extractTextDelta returns nil for malformed JSON")
+    func extractTextDeltaMalformedJSON() {
+        let result = extractTextDelta(from: "not-json")
+        #expect(result == nil)
+    }
+
+    // MARK: - parseTokenUsage tests
+
+    @Test("parseTokenUsage returns usage from a valid result event")
+    func parseTokenUsageReturnsUsage() {
+        let line = #"{"type":"result","subtype":"success","is_error":false,"result":"ok","duration_ms":1200,"num_turns":1,"total_cost_usd":0.005,"usage":{"input_tokens":100,"cache_creation_input_tokens":20,"cache_read_input_tokens":5,"output_tokens":50},"modelUsage":{}}"#
+        let usage = parseTokenUsage(from: line)
+        #expect(usage != nil)
+        #expect(usage?.inputTokens == 100)
+        #expect(usage?.cacheCreationInputTokens == 20)
+        #expect(usage?.cacheReadInputTokens == 5)
+        #expect(usage?.outputTokens == 50)
+        #expect(usage?.totalCostUSD == 0.005)
+        #expect(usage?.durationMs == 1200)
+        #expect(usage?.totalInputTokens == 125)
+    }
+
+    @Test("parseTokenUsage returns nil when no result event is present")
+    func parseTokenUsageReturnsNilForNonResultLine() {
+        let line = #"{"type":"stream_event","event":{"type":"message_start"}}"#
+        let usage = parseTokenUsage(from: line)
+        #expect(usage == nil)
+    }
+
+    @Test("parseTokenUsage returns nil for empty input")
+    func parseTokenUsageReturnsNilForEmpty() {
+        let usage = parseTokenUsage(from: "")
+        #expect(usage == nil)
+    }
 }
