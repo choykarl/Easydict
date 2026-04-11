@@ -116,9 +116,9 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                     // Raw stderr bytes; decoded to String once in the termination handler
                     // after all data has arrived, so multi-byte UTF-8 sequences are never split.
                     var stderrDataBuffer = Data()
-                    // Accumulates only non-delta stdout lines for post-exit error/usage detection.
-                    // Excludes content_block_delta events to bound memory usage.
-                    var stdoutControlBuffer = ""
+                    // Accumulates non-delta stdout lines for post-exit error/usage detection.
+                    // Stored as an array to avoid O(N²) string concatenation on repeated appends.
+                    var stdoutControlLines: [String] = []
                     // Incomplete stdout bytes carried over between readabilityHandler calls.
                     // Buffered at the Data level so multi-byte UTF-8 chars split across reads
                     // are not dropped when converting to String.
@@ -131,20 +131,12 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                         let data = handle.availableData
                         guard !data.isEmpty else { return }
                         Self.ioQueue.async {
-                            let maxSize = 1_048_576 // 1 MB
-                            if stderrDataBuffer.count + data.count <= maxSize {
-                                stderrDataBuffer.append(data)
-                            } else {
-                                let combined = stderrDataBuffer + data
-                                stderrDataBuffer = Data(combined.suffix(maxSize))
-                            }
+                            Self.appendCapped(data, to: &stderrDataBuffer)
                         }
                     }
 
                     // Read stdout line by line, parse each JSON event, and yield text deltas.
-                    // Only non-delta lines are kept in stdoutControlBuffer for error/usage parsing.
-                    // Buffers raw Data and splits on the newline byte (0x0A) so that multi-byte
-                    // UTF-8 characters cut across two availableData reads are never dropped.
+                    // Only non-delta lines are kept in stdoutControlLines for error/usage parsing.
                     stdoutPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
                         let data = handle.availableData
                         guard !data.isEmpty else { return }
@@ -152,30 +144,16 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                         Self.ioQueue.async {
                             capturedLogger?.appendStdout(String(data: data, encoding: .utf8) ?? "")
                             stdoutDataBuffer.append(data)
-
-                            // Consume all complete newline-terminated lines from the data buffer.
-                            // Splitting on the 0x0A byte is safe because newline is a single byte
-                            // in UTF-8; multi-byte sequences never contain 0x0A.
-                            while let idx = stdoutDataBuffer.firstIndex(of: 0x0A) {
-                                let lineData = stdoutDataBuffer[..<idx]
-                                if let line = String(data: lineData, encoding: .utf8), !line.isEmpty {
-                                    if let delta = extractTextDelta(from: line, decoder: decoder) {
-                                        continuation.yield(delta)
-                                    } else {
-                                        // Retain control events (result, rate_limit_event, system) for
-                                        // post-exit error detection and token-usage parsing.
-                                        stdoutControlBuffer += line + "\n"
-                                    }
-                                }
-                                stdoutDataBuffer = Data(
-                                    stdoutDataBuffer[stdoutDataBuffer.index(after: idx)...]
-                                )
-                            }
+                            Self.flushLines(
+                                from: &stdoutDataBuffer,
+                                into: &stdoutControlLines,
+                                decoder: decoder,
+                                continuation: continuation
+                            )
                         }
                     }
 
                     process.terminationHandler = { [weak self] terminatedProcess in
-                        // Nil out handlers to stop new deliveries from the OS.
                         stdoutPipe.fileHandleForReading.readabilityHandler = nil
                         stderrPipe.fileHandleForReading.readabilityHandler = nil
 
@@ -200,56 +178,32 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                                     .appendStdout(String(data: remainingStdoutData, encoding: .utf8) ?? "")
                                 stdoutDataBuffer.append(remainingStdoutData)
                             }
-
-                            // Flush all remaining newline-terminated lines from the data buffer.
-                            while let idx = stdoutDataBuffer.firstIndex(of: 0x0A) {
-                                let lineData = stdoutDataBuffer[..<idx]
-                                if let line = String(data: lineData, encoding: .utf8), !line.isEmpty {
-                                    if let delta = extractTextDelta(from: line, decoder: decoder) {
-                                        continuation.yield(delta)
-                                    } else {
-                                        stdoutControlBuffer += line + "\n"
-                                    }
-                                }
-                                stdoutDataBuffer = Data(
-                                    stdoutDataBuffer[stdoutDataBuffer.index(after: idx)...]
-                                )
-                            }
-                            // Handle any data remaining without a trailing newline.
-                            if !stdoutDataBuffer.isEmpty,
-                               let line = String(data: stdoutDataBuffer, encoding: .utf8),
-                               !line.isEmpty {
-                                if let delta = extractTextDelta(from: line, decoder: decoder) {
-                                    continuation.yield(delta)
-                                } else {
-                                    stdoutControlBuffer += line + "\n"
-                                }
-                            }
+                            Self.flushLines(
+                                from: &stdoutDataBuffer,
+                                into: &stdoutControlLines,
+                                includeRemainder: true,
+                                decoder: decoder,
+                                continuation: continuation
+                            )
 
                             if !remainingStderrData.isEmpty {
-                                let maxSize = 1_048_576
-                                if stderrDataBuffer.count + remainingStderrData.count <= maxSize {
-                                    stderrDataBuffer.append(remainingStderrData)
-                                } else {
-                                    let combined = stderrDataBuffer + remainingStderrData
-                                    stderrDataBuffer = Data(combined.suffix(maxSize))
-                                }
+                                Self.appendCapped(remainingStderrData, to: &stderrDataBuffer)
                             }
-                            // Decode the complete stderr buffer now that all bytes have arrived.
                             let stderrBuffer = String(data: stderrDataBuffer, encoding: .utf8) ?? ""
 
                             let duration = Date().timeIntervalSince(startTime)
                             capturedLogger?.finish(stderr: stderrBuffer, exitCode: exitCode, duration: duration)
 
-                            // Parse token usage from the `result` event in the control-line buffer.
-                            self?.tokenUsage = parseTokenUsage(from: stdoutControlBuffer)
+                            // Join control lines once here; used by both parseTokenUsage and parseError.
+                            let controlBuffer = stdoutControlLines.joined(separator: "\n")
+                            self?.tokenUsage = parseTokenUsage(from: controlBuffer)
 
                             ClaudeCodeDebugLogger.shared.post(
                                 "[EXIT] code=\(exitCode)  duration=\(String(format: "%.1f", duration))s"
                             )
 
                             if exitCode != 0, !wasCancelled {
-                                let error = parseError(fromStdout: stdoutControlBuffer, stderr: stderrBuffer)
+                                let error = parseError(fromStdout: controlBuffer, stderr: stderrBuffer)
                                 continuation.finish(throwing: error)
                             } else {
                                 // Either success or user-initiated cancellation — finish cleanly.
@@ -305,9 +259,64 @@ final class ClaudeCodeRunner: @unchecked Sendable {
     /// a user-initiated stop from a real CLI failure.
     private var isCancelled = false
 
-    /// Builds the argument list for a `claude -p` invocation.
+    /// Drains all newline-terminated lines from `buffer`, yielding text deltas to
+    /// `continuation` and appending non-delta lines to `controlLines`.
     ///
-    /// Extracted from `run()` to keep that method within the line-length limit.
+    /// Splits on the 0x0A byte, which is safe because newline is a single byte in UTF-8;
+    /// multi-byte sequences never contain 0x0A. Uses a read-head offset to avoid creating
+    /// an intermediate `Data` copy per newline, keeping the hot streaming path at O(N).
+    ///
+    /// - Parameter includeRemainder: When `true`, any bytes remaining after the last newline
+    ///   are also decoded and dispatched. Pass `true` only in the termination handler after
+    ///   all pipe data has been read, so a final line without a trailing newline is not lost.
+    private static func flushLines(
+        from buffer: inout Data,
+        into controlLines: inout [String],
+        includeRemainder: Bool = false,
+        decoder: JSONDecoder,
+        continuation: AsyncThrowingStream<String, Error>.Continuation
+    ) {
+        var readHead = buffer.startIndex
+        while let newlineIdx = buffer[readHead...].firstIndex(of: 0x0A) {
+            let lineData = buffer[readHead..<newlineIdx]
+            if let line = String(data: lineData, encoding: .utf8), !line.isEmpty {
+                if let delta = extractTextDelta(from: line, decoder: decoder) {
+                    continuation.yield(delta)
+                } else {
+                    // Retain control events (result, rate_limit_event, system) for
+                    // post-exit error detection and token-usage parsing.
+                    controlLines.append(line)
+                }
+            }
+            readHead = buffer.index(after: newlineIdx)
+        }
+        // Advance past all consumed bytes in a single slice (one allocation, not per-line).
+        buffer = readHead < buffer.endIndex ? Data(buffer[readHead...]) : Data()
+
+        if includeRemainder, !buffer.isEmpty,
+           let line = String(data: buffer, encoding: .utf8), !line.isEmpty {
+            if let delta = extractTextDelta(from: line, decoder: decoder) {
+                continuation.yield(delta)
+            } else {
+                controlLines.append(line)
+            }
+            buffer = Data()
+        }
+    }
+
+    /// Appends `data` to `buffer`, capping the total at 1 MB by retaining only the
+    /// most-recent suffix when the limit would be exceeded.
+    ///
+    /// The 1 MB cap prevents unbounded stderr growth if the CLI emits large error payloads.
+    private static func appendCapped(_ data: Data, to buffer: inout Data) {
+        let maxSize = 1_048_576 // 1 MB
+        buffer.append(data)
+        if buffer.count > maxSize {
+            buffer = Data(buffer.suffix(maxSize))
+        }
+    }
+
+    /// Builds the argument list for a `claude -p` invocation.
     private static func buildArguments(prompt: String, systemPrompt: String?) -> [String] {
         var arguments = [
             "-p", prompt,
