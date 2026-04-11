@@ -110,8 +110,6 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                     // Use a neutral working directory so claude does not scan user folders.
                     process.currentDirectoryURL = FileManager.default.temporaryDirectory
 
-                    self?.process = process
-
                     let startTime = Date()
                     // Raw stderr bytes; decoded to String once in the termination handler
                     // after all data has arrived, so multi-byte UTF-8 sequences are never split.
@@ -216,9 +214,15 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                     // cancel() can only terminate a process it already knows about; if it
                     // ran before self?.process was assigned, the subprocess would still launch.
                     guard self?.isCancelled != true else {
+                        // Clear readability handlers so they release captured resources
+                        // (continuation, decoder, buffer vars) without waiting for the
+                        // pipes to be connected to a process that will never launch.
+                        stdoutPipe.fileHandleForReading.readabilityHandler = nil
+                        stderrPipe.fileHandleForReading.readabilityHandler = nil
                         continuation.finish()
                         return
                     }
+                    self?.process = process
                     try process.run()
                     self?.logger?.start()
                 } catch {
@@ -278,7 +282,7 @@ final class ClaudeCodeRunner: @unchecked Sendable {
     ) {
         var readHead = buffer.startIndex
         while let newlineIdx = buffer[readHead...].firstIndex(of: 0x0A) {
-            let lineData = buffer[readHead..<newlineIdx]
+            let lineData = buffer[readHead ..< newlineIdx]
             if let line = String(data: lineData, encoding: .utf8), !line.isEmpty {
                 if let delta = extractTextDelta(from: line, decoder: decoder) {
                     continuation.yield(delta)
@@ -343,37 +347,55 @@ final class ClaudeCodeRunner: @unchecked Sendable {
     ///
     /// - Throws: `ClaudeCodeError.notInstalled` if no binary is found.
     private static func detectClaudeBinary() throws -> String {
-        // All reads and writes go through the lock to prevent data races
-        // when multiple translations start concurrently.
+        // Fast path: return the cached path without performing slow shell detection.
+        // Only the cache read/write is held under the lock; the actual binary probing
+        // runs outside the critical section so concurrent requests do not all serialize
+        // behind a single login-shell invocation.
         cacheLock.lock()
-        defer { cacheLock.unlock() }
         if let cached = cachedBinaryPath {
+            cacheLock.unlock()
             return cached
         }
+        cacheLock.unlock()
+
+        // Slow path: probe for the binary outside the critical section.
+        var resolvedPath: String?
+
         // 1. Try via login shell so PATH from ~/.zshrc / ~/.bash_profile is available.
         //    GUI apps do not inherit the user's shell PATH, so a plain `which` call fails.
         //    Login shells may emit banner text or alias output before the actual path, so
         //    split by newline and find the first line that is an executable file.
         if let raw = runViaLoginShell("which claude") {
-            let validated = raw
+            resolvedPath = raw
                 .components(separatedBy: "\n")
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .first { !$0.isEmpty && FileManager.default.isExecutableFile(atPath: $0) }
-            if let path = validated {
-                cachedBinaryPath = path
-                return path
+        }
+
+        // 2. Check common manual-install locations as fallback.
+        if resolvedPath == nil {
+            let candidates = [
+                "\(NSHomeDirectory())/.local/bin/claude",
+                "\(NSHomeDirectory())/.claude/local/claude",
+                "/usr/local/bin/claude",
+                "/opt/homebrew/bin/claude",
+            ]
+            for candidate in candidates where FileManager.default.isExecutableFile(atPath: candidate) {
+                resolvedPath = candidate
+                break
             }
         }
-        // 2. Check common manual-install locations as fallback.
-        let candidates = [
-            "\(NSHomeDirectory())/.local/bin/claude",
-            "\(NSHomeDirectory())/.claude/local/claude",
-            "/usr/local/bin/claude",
-            "/opt/homebrew/bin/claude",
-        ]
-        for candidate in candidates where FileManager.default.isExecutableFile(atPath: candidate) {
-            cachedBinaryPath = candidate
-            return candidate
+
+        // Re-acquire the lock to write the result.
+        // Re-check the cache in case another concurrent call completed detection first.
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        if let cached = cachedBinaryPath {
+            return cached
+        }
+        if let path = resolvedPath {
+            cachedBinaryPath = path
+            return path
         }
         throw ClaudeCodeError.notInstalled
     }
@@ -400,17 +422,32 @@ final class ClaudeCodeRunner: @unchecked Sendable {
         // sourced tools like nvm, rbenv, or homebrew init). An unread Pipe() has a fixed OS
         // buffer (~64 KB); once full, the child process blocks on write(), causing
         // waitUntilExit() to hang indefinitely and preventing binary detection from completing.
-        // Fall back to a Pipe() if /dev/null cannot be opened (e.g. sandbox restrictions),
+        // Uses the URL-based initialiser (non-deprecated); handle is closed after process exit.
+        // Falls back to a Pipe() if /dev/null cannot be opened (e.g. sandbox restrictions),
         // accepting the theoretical buffer-full hang rather than crashing with nil.
-        process.standardError = FileHandle(forWritingAtPath: "/dev/null") ?? Pipe()
+        let devNullHandle = try? FileHandle(forWritingTo: URL(fileURLWithPath: "/dev/null"))
+        process.standardError = devNullHandle ?? Pipe()
         do {
             try process.run()
+            // Drain stdout concurrently to prevent pipe-buffer deadlock.
+            // Login shell profile scripts can produce stdout output; without concurrent
+            // draining, a large write fills the OS buffer (~64 KB) and the child process
+            // blocks indefinitely, causing waitUntilExit() to hang.
+            var outputData = Data()
+            let readGroup = DispatchGroup()
+            readGroup.enter()
+            DispatchQueue.global(qos: .userInitiated).async {
+                outputData = pipe.fileHandleForReading.readDataToEndOfFile()
+                readGroup.leave()
+            }
             process.waitUntilExit()
+            try? devNullHandle?.close()
+            readGroup.wait()
             guard process.terminationStatus == 0 else { return nil }
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let path = String(data: outputData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
             return path?.isEmpty == false ? path : nil
         } catch {
+            try? devNullHandle?.close()
             return nil
         }
     }

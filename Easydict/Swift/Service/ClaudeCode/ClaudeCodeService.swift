@@ -114,9 +114,10 @@ class ClaudeCodeService: StreamService {
                     self?.tokenUsage = currentRunner.tokenUsage
                     #if AGENT_CLI_DEBUG
                     if let usage = currentRunner.tokenUsage {
-                        continuation.yield(
-                            "\n\n↳ in \(usage.inputTokens) · cache-write \(usage.cacheCreationInputTokens) · cache-read \(usage.cacheReadInputTokens) · out \(usage.outputTokens)"
-                        )
+                        // Append the usage number of token to the end of the translation result
+//                        continuation.yield(
+//                            "\n\n↳ in \(usage.inputTokens) · cache-write \(usage.cacheCreationInputTokens) · cache-read \(usage.cacheReadInputTokens) · out \(usage.outputTokens)"
+//                        )
                     }
                     #endif
                     continuation.finish()
