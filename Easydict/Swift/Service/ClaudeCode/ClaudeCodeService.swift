@@ -95,7 +95,7 @@ final class ClaudeCodeService: StreamService {
 
         // Wrap the stream to capture token usage after the run completes.
         return AsyncThrowingStream { [weak self] continuation in
-            Task {
+            let task = Task {
                 do {
                     for try await chunk in baseStream {
                         continuation.yield(chunk)
@@ -129,6 +129,14 @@ final class ClaudeCodeService: StreamService {
                     }
                     continuation.finish(throwing: queryError)
                 }
+            }
+            // Cancel the inner task when the stream consumer drops the stream early
+            // (e.g. a new query starts before this one finishes). Cancelling the task
+            // propagates CancellationError into the for-await loop, which causes
+            // ClaudeCodeRunner's own onTermination handler to fire and stop the subprocess.
+            continuation.onTermination = { _ in
+                task.cancel()
+                currentRunner.cancel()
             }
         }
     }

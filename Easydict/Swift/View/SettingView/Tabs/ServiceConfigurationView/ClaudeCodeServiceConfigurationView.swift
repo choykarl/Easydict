@@ -25,34 +25,29 @@ struct ClaudeCodeServiceConfigurationView: View {
     // MARK: Internal
 
     var body: some View {
-        VStack(spacing: 16) {
-            // Status row: show whether the CLI is installed.
-            Form {
-                Section {
-                    CLIStatusRow()
-                }
-                #if AGENT_CLI_DEBUG
-                Section {
-                    Button("service.claude_code.debug_log.show_window") {
-                        ClaudeCodeDebugWindowController.shared.toggle()
-                    }
-                }
-                #endif
-            }
-            .formStyle(.grouped)
-            .frame(maxHeight: 160)
-
-            // Reuse StreamConfigurationView for the remaining toggles/prompt sections.
-            StreamConfigurationView(
-                service: service,
-                showAPIKeySection: false,
-                showEndpointSection: false,
-                showSupportedModelsSection: false,
-                showUsedModelSection: false,
-                showThinkTagContent: false,
-                showTemperatureSlider: false
-            )
+        // Status row: show whether the CLI is installed.
+        // Section renders directly inside the outer Form provided by ServiceTab,
+        // so no nested Form is needed here.
+        Section {
+            CLIStatusRow()
         }
+        #if AGENT_CLI_DEBUG
+        Section {
+            Button("service.claude_code.debug_log.show_window") {
+                ClaudeCodeDebugWindowController.shared.toggle()
+            }
+        }
+        #endif
+        // Reuse StreamConfigurationView for the remaining toggles/prompt sections.
+        StreamConfigurationView(
+            service: service,
+            showAPIKeySection: false,
+            showEndpointSection: false,
+            showSupportedModelsSection: false,
+            showUsedModelSection: false,
+            showThinkTagContent: false,
+            showTemperatureSlider: false
+        )
     }
 
     // MARK: Private
