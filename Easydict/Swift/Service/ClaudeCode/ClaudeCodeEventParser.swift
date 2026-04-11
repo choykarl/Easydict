@@ -106,9 +106,11 @@ func parseTokenUsage(from stdout: String) -> CLITokenUsage? {
 /// returns the text delta string when the line represents a `content_block_delta` event.
 ///
 /// All other event types (system, rate_limit, result, etc.) return `nil` and are skipped.
-func extractTextDelta(from line: String) -> String? {
+///
+/// - Parameter decoder: Caller-supplied decoder to avoid per-call allocation on the hot path.
+func extractTextDelta(from line: String, decoder: JSONDecoder = JSONDecoder()) -> String? {
     guard let data = line.data(using: .utf8),
-          let wrapper = try? JSONDecoder().decode(CLIStreamJSONLine.self, from: data),
+          let wrapper = try? decoder.decode(CLIStreamJSONLine.self, from: data),
           wrapper.type == "stream_event",
           let inner = wrapper.event,
           inner.type == "content_block_delta",

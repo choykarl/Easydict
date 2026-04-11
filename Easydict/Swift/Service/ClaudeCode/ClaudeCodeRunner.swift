@@ -84,6 +84,9 @@ final class ClaudeCodeRunner: @unchecked Sendable {
             // so a plain Task { } would run on the main actor and block the UI when
             // detectClaudeBinary() spawns a login shell on the first invocation.
             Task.detached(priority: .userInitiated) { [weak self] in
+                // One decoder per invocation, shared across all readabilityHandler calls.
+                // Avoids the per-line JSONDecoder allocation on the hot streaming path.
+                let decoder = JSONDecoder()
                 do {
                     let binaryPath = try Self.detectClaudeBinary()
                     #if AGENT_CLI_DEBUG
@@ -126,14 +129,6 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                     // Incomplete JSON line carried over between readabilityHandler calls.
                     var lineBuffer = ""
 
-                    // Serial queue that owns all buffer mutations and continuation yields.
-                    // Prevents data races between the stderr handler, stdout handler, and
-                    // termination handler, which each run on separate OS-managed queues.
-                    let ioQueue = DispatchQueue(
-                        label: "com.easydict.claude-code-runner-io",
-                        qos: .userInitiated
-                    )
-
                     // Read stderr asynchronously into a buffer (capped at 1 MB).
                     stderrPipe.fileHandleForReading.readabilityHandler = { handle in
                         let data = handle.availableData
@@ -162,7 +157,7 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                             // is a full JSON event. The last element is a partial line kept in the buffer.
                             let lines = lineBuffer.components(separatedBy: "\n")
                             for line in lines.dropLast() where !line.isEmpty {
-                                if let delta = extractTextDelta(from: line) {
+                                if let delta = extractTextDelta(from: line, decoder: decoder) {
                                     continuation.yield(delta)
                                 } else {
                                     // Retain control events (result, rate_limit_event, system) for
@@ -196,7 +191,7 @@ final class ClaudeCodeRunner: @unchecked Sendable {
 
                             // Process any lines remaining in the line buffer.
                             for line in lineBuffer.components(separatedBy: "\n") where !line.isEmpty {
-                                if let delta = extractTextDelta(from: line) {
+                                if let delta = extractTextDelta(from: line, decoder: decoder) {
                                     continuation.yield(delta)
                                 } else {
                                     stdoutControlBuffer += line + "\n"
@@ -253,6 +248,14 @@ final class ClaudeCodeRunner: @unchecked Sendable {
     /// Cached path from the first successful `detectClaudeBinary()` call.
     /// Avoids spawning a login shell on every translation request.
     private static var cachedBinaryPath: String?
+    private static let cacheLock = NSLock()
+
+    /// Shared serial queue for all I/O handler dispatches across invocations.
+    /// Reusing one queue avoids the overhead of creating a new DispatchQueue per translation.
+    private static let ioQueue = DispatchQueue(
+        label: "com.easydict.claude-code-runner-io",
+        qos: .userInitiated
+    )
 
     private var process: Process?
     private var logger: ClaudeCodeLogger?
@@ -267,6 +270,13 @@ final class ClaudeCodeRunner: @unchecked Sendable {
     ///
     /// - Throws: `ClaudeCodeError.notInstalled` if no binary is found.
     private static func detectClaudeBinary() throws -> String {
+        // Fast path: return cached value without acquiring the lock.
+        if let cached = cachedBinaryPath {
+            return cached
+        }
+        // Slow path: acquire lock, re-check (double-checked locking), then resolve.
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
         if let cached = cachedBinaryPath {
             return cached
         }
