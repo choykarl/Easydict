@@ -218,10 +218,11 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                                 "[EXIT] code=\(exitCode)  duration=\(String(format: "%.1f", duration))s"
                             )
 
-                            if exitCode != 0 {
+                            if exitCode != 0, self?.isCancelled != true {
                                 let error = parseError(fromStdout: stdoutControlBuffer, stderr: stderrBuffer)
                                 continuation.finish(throwing: error)
                             } else {
+                                // Either success or user-initiated cancellation — finish cleanly.
                                 continuation.finish()
                             }
                         }
@@ -238,6 +239,7 @@ final class ClaudeCodeRunner: @unchecked Sendable {
 
     /// Terminates the subprocess if it is running.
     func cancel() {
+        isCancelled = true
         process?.terminate()
         process = nil
     }
@@ -250,6 +252,9 @@ final class ClaudeCodeRunner: @unchecked Sendable {
 
     private var process: Process?
     private var logger: ClaudeCodeLogger?
+    /// Set to `true` by `cancel()` so the termination handler can distinguish
+    /// a user-initiated stop from a real CLI failure.
+    private var isCancelled = false
 
     /// Returns the path to the first `claude` binary found on this machine.
     ///
@@ -263,9 +268,17 @@ final class ClaudeCodeRunner: @unchecked Sendable {
         }
         // 1. Try via login shell so PATH from ~/.zshrc / ~/.bash_profile is available.
         //    GUI apps do not inherit the user's shell PATH, so a plain `which` call fails.
-        if let path = runViaLoginShell("which claude") {
-            cachedBinaryPath = path
-            return path
+        //    Login shells may emit banner text or alias output before the actual path, so
+        //    split by newline and find the first line that is an executable file.
+        if let raw = runViaLoginShell("which claude") {
+            let validated = raw
+                .components(separatedBy: "\n")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .first { !$0.isEmpty && FileManager.default.isExecutableFile(atPath: $0) }
+            if let path = validated {
+                cachedBinaryPath = path
+                return path
+            }
         }
         // 2. Check common manual-install locations as fallback.
         let candidates = [
