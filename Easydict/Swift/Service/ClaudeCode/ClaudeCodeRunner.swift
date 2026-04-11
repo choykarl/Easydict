@@ -79,11 +79,15 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                 return
             }
 
-            Task {
+            // Use Task.detached to break out of any inherited actor context (e.g. @MainActor).
+            // The call chain that reaches here is typically initiated from the main thread,
+            // so a plain Task { } would run on the main actor and block the UI when
+            // detectClaudeBinary() spawns a login shell on the first invocation.
+            Task.detached(priority: .userInitiated) { [weak self] in
                 do {
                     let binaryPath = try Self.detectClaudeBinary()
                     #if AGENT_CLI_DEBUG
-                    self.logger = ClaudeCodeLogger(command: "\(binaryPath) -p <prompt>", prompt: prompt)
+                    self?.logger = ClaudeCodeLogger(command: "\(binaryPath) -p <prompt>", prompt: prompt)
                     #endif
 
                     let process = Process()
@@ -112,7 +116,7 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                     // Use a neutral working directory so claude does not scan user folders.
                     process.currentDirectoryURL = FileManager.default.temporaryDirectory
 
-                    self.process = process
+                    self?.process = process
 
                     let startTime = Date()
                     var stderrBuffer = ""
@@ -229,7 +233,7 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                     }
 
                     try process.run()
-                    self.logger?.start()
+                    self?.logger?.start()
                 } catch {
                     continuation.finish(throwing: error)
                 }
