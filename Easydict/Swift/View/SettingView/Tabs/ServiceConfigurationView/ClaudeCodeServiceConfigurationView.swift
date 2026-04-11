@@ -1,5 +1,5 @@
 //
-//  AgentCLIServiceConfigurationView.swift
+//  ClaudeCodeServiceConfigurationView.swift
 //  Easydict
 //
 //  Created by Karl on 2026/04/07.

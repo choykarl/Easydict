@@ -79,6 +79,12 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                 return
             }
 
+            // Ensure the subprocess is terminated if the stream consumer cancels early
+            // (e.g. a new query starts before the current one finishes).
+            continuation.onTermination = { [weak self] _ in
+                self?.cancel()
+            }
+
             // Use Task.detached to break out of any inherited actor context (e.g. @MainActor).
             // The call chain that reaches here is typically initiated from the main thread,
             // so a plain Task { } would run on the main actor and block the UI when
@@ -271,7 +277,11 @@ final class ClaudeCodeRunner: @unchecked Sendable {
     /// Terminates the subprocess if it is running.
     func cancel() {
         isCancelled = true
-        process?.terminate()
+        // Guard isRunning before terminate() to avoid NSInvalidArgumentException
+        // when cancel() is called before the process has been launched.
+        if process?.isRunning == true {
+            process?.terminate()
+        }
         process = nil
     }
 

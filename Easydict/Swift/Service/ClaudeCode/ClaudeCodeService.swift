@@ -120,6 +120,10 @@ class ClaudeCodeService: StreamService {
                     }
                     #endif
                     continuation.finish()
+                } catch is CancellationError {
+                    // Task cancellation is user-initiated — finish cleanly without an error.
+                    self?.tokenUsage = currentRunner.tokenUsage
+                    continuation.finish()
                 } catch {
                     self?.tokenUsage = currentRunner.tokenUsage
                     // Preserve LocalizedError.errorDescription for ClaudeCodeError.
