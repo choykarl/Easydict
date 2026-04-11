@@ -96,7 +96,11 @@ struct ClaudeCodeCLIRunnerTests {
 
     @Test("extractTextDelta returns nil for a non-delta event type")
     func extractTextDeltaIgnoresNonDelta() {
-        let line = #"{"type":"result","subtype":"success","is_error":false,"result":"ok","duration_ms":500,"num_turns":1,"total_cost_usd":0.001,"usage":{"input_tokens":10,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":5},"modelUsage":{}}"#
+        let line =
+            #"{"type":"result","subtype":"success","is_error":false,"result":"ok","# +
+            #""duration_ms":500,"num_turns":1,"total_cost_usd":0.001,"# +
+            #""usage":{"input_tokens":10,"cache_creation_input_tokens":0,"# +
+            #""cache_read_input_tokens":0,"output_tokens":5},"modelUsage":{}}"#
         let result = extractTextDelta(from: line)
         #expect(result == nil)
     }
@@ -111,7 +115,11 @@ struct ClaudeCodeCLIRunnerTests {
 
     @Test("parseTokenUsage returns usage from a valid result event")
     func parseTokenUsageReturnsUsage() {
-        let line = #"{"type":"result","subtype":"success","is_error":false,"result":"ok","duration_ms":1200,"num_turns":1,"total_cost_usd":0.005,"usage":{"input_tokens":100,"cache_creation_input_tokens":20,"cache_read_input_tokens":5,"output_tokens":50},"modelUsage":{}}"#
+        let line =
+            #"{"type":"result","subtype":"success","is_error":false,"result":"ok","# +
+            #""duration_ms":1200,"num_turns":1,"total_cost_usd":0.005,"# +
+            #""usage":{"input_tokens":100,"cache_creation_input_tokens":20,"# +
+            #""cache_read_input_tokens":5,"output_tokens":50},"modelUsage":{}}"#
         let usage = parseTokenUsage(from: line)
         #expect(usage != nil)
         #expect(usage?.inputTokens == 100)

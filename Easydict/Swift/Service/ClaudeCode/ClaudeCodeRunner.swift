@@ -98,22 +98,7 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                     let stderrPipe = Pipe()
 
                     process.executableURL = URL(fileURLWithPath: binaryPath)
-                    var arguments = [
-                        "-p", prompt,
-                        "--output-format", "stream-json",
-                        "--include-partial-messages",
-                        "--no-session-persistence",
-                        "--tools", "", // disable all built-in tools
-                        "--strict-mcp-config", // ignore user MCP config; no --mcp-config = no servers
-                        "--setting-sources", "", // skip all settings files to prevent plugin hooks
-                    ]
-                    #if AGENT_CLI_DEBUG
-                    arguments.append("--verbose")
-                    #endif
-                    if let systemPrompt, !systemPrompt.isEmpty {
-                        arguments += ["--system-prompt", systemPrompt]
-                    }
-                    process.arguments = arguments
+                    process.arguments = Self.buildArguments(prompt: prompt, systemPrompt: systemPrompt)
                     process.standardOutput = stdoutPipe
                     process.standardError = stderrPipe
                     // Use a neutral working directory so claude does not scan user folders.
@@ -133,7 +118,7 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                     stderrPipe.fileHandleForReading.readabilityHandler = { handle in
                         let data = handle.availableData
                         guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
-                        ioQueue.async {
+                        Self.ioQueue.async {
                             let maxSize = 1_048_576 // 1 MB
                             if stderrBuffer.utf8.count + text.utf8.count <= maxSize {
                                 stderrBuffer += text
@@ -149,7 +134,7 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                         let data = handle.availableData
                         guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
                         let capturedLogger = self?.logger
-                        ioQueue.async {
+                        Self.ioQueue.async {
                             capturedLogger?.appendStdout(text)
                             lineBuffer += text
 
@@ -189,7 +174,7 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                         // Capture logger strongly so it outlives the weak self reference.
                         let capturedLogger = self?.logger
 
-                        ioQueue.async { [weak self] in
+                        Self.ioQueue.async { [weak self] in
                             if let text = String(data: remainingStdoutData, encoding: .utf8), !text.isEmpty {
                                 capturedLogger?.appendStdout(text)
                                 lineBuffer += text
@@ -275,6 +260,28 @@ final class ClaudeCodeRunner: @unchecked Sendable {
     /// Set to `true` by `cancel()` so the termination handler can distinguish
     /// a user-initiated stop from a real CLI failure.
     private var isCancelled = false
+
+    /// Builds the argument list for a `claude -p` invocation.
+    ///
+    /// Extracted from `run()` to keep that method within the line-length limit.
+    private static func buildArguments(prompt: String, systemPrompt: String?) -> [String] {
+        var arguments = [
+            "-p", prompt,
+            "--output-format", "stream-json",
+            "--include-partial-messages",
+            "--no-session-persistence",
+            "--tools", "", // disable all built-in tools
+            "--strict-mcp-config", // ignore user MCP config; no --mcp-config = no servers
+            "--setting-sources", "", // skip all settings files to prevent plugin hooks
+        ]
+        #if AGENT_CLI_DEBUG
+        arguments.append("--verbose")
+        #endif
+        if let systemPrompt, !systemPrompt.isEmpty {
+            arguments += ["--system-prompt", systemPrompt]
+        }
+        return arguments
+    }
 
     /// Returns the path to the first `claude` binary found on this machine.
     ///
