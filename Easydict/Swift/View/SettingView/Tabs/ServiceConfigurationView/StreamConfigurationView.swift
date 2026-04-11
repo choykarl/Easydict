@@ -207,14 +207,6 @@ struct StreamConfigurationView: View {
                     footnote: "service.configuration.custom_openai.enable_streaming.footnote"
                 )
             }
-
-            if showStreamingToggle {
-                ToggleCell(
-                    titleKey: "service.configuration.custom_openai.enable_streaming.title",
-                    key: service.enableStreamingKey,
-                    footnote: "service.configuration.custom_openai.enable_streaming.footnote"
-                )
-            }
         }
     }
 }
