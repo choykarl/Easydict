@@ -6,7 +6,7 @@
 //  Copyright © 2026 izual. All rights reserved.
 //
 
-#if DEBUG
+#if AGENT_CLI_DEBUG
 import AppKit
 import Combine
 import Foundation

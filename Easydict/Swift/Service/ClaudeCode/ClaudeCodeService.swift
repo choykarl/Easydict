@@ -112,7 +112,7 @@ class ClaudeCodeService: StreamService {
                         continuation.yield(chunk)
                     }
                     self?.tokenUsage = currentRunner.tokenUsage
-                    #if DEBUG
+                    #if AGENT_CLI_DEBUG
                     if let usage = currentRunner.tokenUsage {
                         continuation.yield(
                             "\n\n↳ in \(usage.inputTokens) · cache-write \(usage.cacheCreationInputTokens) · cache-read \(usage.cacheReadInputTokens) · out \(usage.outputTokens)"

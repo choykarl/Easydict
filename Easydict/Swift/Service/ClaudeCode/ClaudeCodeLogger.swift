@@ -143,7 +143,7 @@ final class ClaudeCodeDebugLogger {
 
     /// Posts a log line to all observers (no-op in Release builds).
     func post(_ text: String) {
-        #if DEBUG
+        #if AGENT_CLI_DEBUG
         NotificationCenter.default.post(
             name: Self.didAppendNotification,
             object: nil,

@@ -31,7 +31,7 @@ struct AgentCLIServiceConfigurationView: View {
                 Section {
                     CLIStatusRow()
                 }
-                #if DEBUG
+                #if AGENT_CLI_DEBUG
                 Section {
                     Button("Show Debug Log Window") {
                         ClaudeCodeDebugWindowController.shared.toggle()

@@ -4755,6 +4755,7 @@
       }
     },
     "service.claude_code.name" : {
+      "comment" : "The name of Claude Code",
       "localizations" : {
         "en" : {
           "stringUnit" : {
