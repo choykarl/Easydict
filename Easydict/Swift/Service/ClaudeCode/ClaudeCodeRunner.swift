@@ -174,6 +174,12 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                         stdoutPipe.fileHandleForReading.readabilityHandler = nil
                         stderrPipe.fileHandleForReading.readabilityHandler = nil
 
+                        // Capture isCancelled by value NOW, while self may still exist.
+                        // ClaudeCodeService.cancelStream() sets runner = nil immediately, so
+                        // self can be deallocated before ioQueue.async runs, making
+                        // self?.isCancelled evaluate as nil (i.e. false) even after cancellation.
+                        let wasCancelled = self?.isCancelled == true
+
                         // Read remaining pipe data synchronously on the termination-handler queue
                         // before dispatching to ioQueue, so the OS pipe buffer is drained promptly.
                         let remainingStdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
@@ -217,7 +223,7 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                                 "[EXIT] code=\(exitCode)  duration=\(String(format: "%.1f", duration))s"
                             )
 
-                            if exitCode != 0, self?.isCancelled != true {
+                            if exitCode != 0, !wasCancelled {
                                 let error = parseError(fromStdout: stdoutControlBuffer, stderr: stderrBuffer)
                                 continuation.finish(throwing: error)
                             } else {
@@ -227,6 +233,13 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                         }
                     }
 
+                    // Guard against launching after cancellation that arrived during setup.
+                    // cancel() can only terminate a process it already knows about; if it
+                    // ran before self?.process was assigned, the subprocess would still launch.
+                    guard self?.isCancelled != true else {
+                        continuation.finish()
+                        return
+                    }
                     try process.run()
                     self?.logger?.start()
                 } catch {
