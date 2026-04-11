@@ -44,7 +44,7 @@ class ClaudeCodeService: StreamService {
     }
 
     public override func configurationListItems() -> Any? {
-        AgentCLIServiceConfigurationView(service: self)
+        ClaudeCodeServiceConfigurationView(service: self)
     }
 
     // MARK: Internal

@@ -9,13 +9,13 @@
 import SFSafeSymbols
 import SwiftUI
 
-// MARK: - AgentCLIServiceConfigurationView
+// MARK: - ClaudeCodeServiceConfigurationView
 
-/// Configuration view for CLI-based translation services (e.g. Claude Code).
+/// Configuration view for the Claude Code translation service.
 ///
 /// Hides API key, endpoint, model, temperature, and think-tag sections
 /// since they are not applicable to CLI tools.
-struct AgentCLIServiceConfigurationView: View {
+struct ClaudeCodeServiceConfigurationView: View {
     // MARK: Lifecycle
 
     init(service: StreamService) {
