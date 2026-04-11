@@ -4760,6 +4760,35 @@
         }
       }
     },
+    "service.claude_code.cli_error.unknown" : {
+      "comment" : "Fallback message when the CLI exits with a non-zero code but produces no stderr output",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "non-zero exit, no stderr output"
+          }
+        },
+        "sk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nenulový exit kód, žiadny stderr výstup"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "退出码非零，无 stderr 输出"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "退出碼非零，無 stderr 輸出"
+          }
+        }
+      }
+    },
     "service.claude_code.name" : {
       "comment" : "The name of Claude Code",
       "localizations" : {

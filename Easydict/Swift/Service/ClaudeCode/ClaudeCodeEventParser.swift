@@ -75,9 +75,9 @@ func parseError(fromStdout stdout: String, stderr: String) -> ClaudeCodeError {
     if lower.contains("rate limit") || lower.contains("quota") || lower.contains("usage limit") {
         return .quotaExceeded(message: nil)
     }
-    // Use the cleaned stderr text if available; fall back to a generic message so the
-    // caller never receives an empty string that gives the user no actionable information.
-    let message = cleaned.isEmpty ? "Unknown CLI error (exit code non-zero)" : cleaned
+    // Use the cleaned stderr text if available; fall back to a localized generic message so
+    // the caller never receives an empty string that gives the user no actionable information.
+    let message = cleaned.isEmpty ? String(localized: "service.claude_code.cli_error.unknown") : cleaned
     return .cliError(message: message)
 }
 

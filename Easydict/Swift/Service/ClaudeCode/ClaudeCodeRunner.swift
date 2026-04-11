@@ -155,11 +155,11 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                         stdoutPipe.fileHandleForReading.readabilityHandler = nil
                         stderrPipe.fileHandleForReading.readabilityHandler = nil
 
-                        // Capture isCancelled by value NOW, while self may still exist.
+                        // Capture isCancelled by value NOW under stateLock, while self may still exist.
                         // ClaudeCodeService.cancelStream() sets runner = nil immediately, so
                         // self can be deallocated before ioQueue.async runs, making
-                        // self?.isCancelled evaluate as nil (i.e. false) even after cancellation.
-                        let wasCancelled = self?.isCancelled == true
+                        // self?.checkIsCancelled() return nil (treated as false) even after cancellation.
+                        let wasCancelled = self?.checkIsCancelled() ?? false
 
                         // Read remaining pipe data synchronously on the termination-handler queue
                         // before dispatching to ioQueue, so the OS pipe buffer is drained promptly.
@@ -210,10 +210,10 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                         }
                     }
 
-                    // Guard against launching after cancellation that arrived during setup.
-                    // cancel() can only terminate a process it already knows about; if it
-                    // ran before self?.process was assigned, the subprocess would still launch.
-                    guard self?.isCancelled != true else {
+                    // Atomically check isCancelled and assign self.process so that cancel()
+                    // cannot run between a plain guard check and the subsequent assignment.
+                    // Returns false (== nil) if the runner was already cancelled.
+                    guard self?.setProcessIfNotCancelled(process) == true else {
                         // Clear readability handlers so they release captured resources
                         // (continuation, decoder, buffer vars) without waiting for the
                         // pipes to be connected to a process that will never launch.
@@ -222,7 +222,6 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                         continuation.finish()
                         return
                     }
-                    self?.process = process
                     try process.run()
                     self?.logger?.start()
                 } catch {
@@ -234,13 +233,19 @@ final class ClaudeCodeRunner: @unchecked Sendable {
 
     /// Terminates the subprocess if it is running.
     func cancel() {
-        isCancelled = true
+        // Capture the current process and flip the flag atomically so that a concurrent
+        // guard check in Task.detached sees a consistent state.
+        let processToTerminate = stateLock.withLock { () -> Process? in
+            isCancelled = true
+            let current = process
+            process = nil
+            return current
+        }
         // Guard isRunning before terminate() to avoid NSInvalidArgumentException
         // when cancel() is called before the process has been launched.
-        if process?.isRunning == true {
-            process?.terminate()
+        if processToTerminate?.isRunning == true {
+            processToTerminate?.terminate()
         }
-        process = nil
     }
 
     // MARK: Private
@@ -260,8 +265,11 @@ final class ClaudeCodeRunner: @unchecked Sendable {
     private var process: Process?
     private var logger: ClaudeCodeLogger?
     /// Set to `true` by `cancel()` so the termination handler can distinguish
-    /// a user-initiated stop from a real CLI failure.
+    /// a user-initiated stop from a real CLI failure. Always access under `stateLock`.
     private var isCancelled = false
+    /// Serializes read/write access to `isCancelled` and `process` across
+    /// `cancel()` (caller thread) and `Task.detached` (concurrency thread pool).
+    private let stateLock = NSLock()
 
     /// Drains all newline-terminated lines from `buffer`, yielding text deltas to
     /// `continuation` and appending non-delta lines to `controlLines`.
@@ -449,6 +457,26 @@ final class ClaudeCodeRunner: @unchecked Sendable {
         } catch {
             try? devNullHandle?.close()
             return nil
+        }
+    }
+
+    /// Reads `isCancelled` thread-safely under `stateLock`.
+    private func checkIsCancelled() -> Bool {
+        stateLock.withLock { isCancelled }
+    }
+
+    /// Atomically checks `isCancelled` and, if not cancelled, assigns `process`.
+    ///
+    /// Combining the check and the assignment into one locked operation closes the race
+    /// window that exists when the two steps run separately: `cancel()` could execute
+    /// between a plain guard check and the subsequent `self.process = …` write.
+    ///
+    /// - Returns: `true` if the process was assigned; `false` if already cancelled.
+    private func setProcessIfNotCancelled(_ newProcess: Process) -> Bool {
+        stateLock.withLock {
+            guard !isCancelled else { return false }
+            process = newProcess
+            return true
         }
     }
 }

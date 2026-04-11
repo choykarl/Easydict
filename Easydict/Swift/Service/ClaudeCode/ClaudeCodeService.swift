@@ -17,7 +17,7 @@ import Foundation
 /// to slot into the `StreamService` pipeline — all accumulation, throttling,
 /// and result management are handled by the base class.
 @objc(EZClaudeCodeService)
-class ClaudeCodeService: StreamService {
+final class ClaudeCodeService: StreamService {
     // MARK: Public
 
     /// Token usage from the most recent completed translation.
@@ -31,7 +31,7 @@ class ClaudeCodeService: StreamService {
     }
 
     public override func name() -> String {
-        NSLocalizedString("service.claude_code.name", comment: "The name of Claude Code")
+        String(localized: "service.claude_code.name")
     }
 
     public override func apiKeyRequirement() -> ServiceAPIKeyRequirement {
@@ -47,8 +47,6 @@ class ClaudeCodeService: StreamService {
         ClaudeCodeServiceConfigurationView(service: self)
     }
 
-    // MARK: Internal
-
     /// Spawns `claude -p` and streams its stdout as text delta chunks.
     ///
     /// The base class `streamTranslate` handles chunk accumulation, `isStreamFinished`,
@@ -58,7 +56,7 @@ class ClaudeCodeService: StreamService {
     /// The system message is separated from the conversation and passed via `--system-prompt`
     /// so it replaces Claude Code's default system prompt (which is large and tool-heavy).
     /// The remaining user/assistant messages are passed as the `-p` prompt.
-    override func contentStreamTranslate(
+    public override func contentStreamTranslate(
         _ text: String,
         from: Language,
         to: Language
@@ -78,17 +76,12 @@ class ClaudeCodeService: StreamService {
         // (which loads tool descriptions, hooks, etc.).
         // User / assistant messages are joined with role prefixes as the `-p` prompt.
         let messages = chatMessageDicts(chatQueryParam)
-        var systemParts: [String] = []
-        var conversationMessages: [ChatMessage] = []
-        for message in messages {
-            if message.role == .system {
-                systemParts.append(message.content)
-            } else {
-                conversationMessages.append(message)
-            }
-        }
+        let systemPrompt = messages
+            .filter { $0.role == .system }
+            .map(\.content)
+            .joined(separator: "\n\n")
+        let conversationMessages = messages.filter { $0.role != .system }
 
-        let systemPrompt = systemParts.joined(separator: "\n\n")
         let conversationPrompt = conversationMessages
             .map { "\($0.role.rawValue): \($0.content)" }
             .joined(separator: "\n\n")
@@ -100,11 +93,7 @@ class ClaudeCodeService: StreamService {
             systemPrompt: systemPrompt.isEmpty ? nil : systemPrompt
         )
 
-        // Wrap the stream to capture token usage and, in DEBUG builds, append a
-        // usage summary as a final text chunk so it gets accumulated into the
-        // translation result naturally (getFinalResultText runs after the stream
-        // ends and the result is already frozen, so a trailing chunk is the only
-        // reliable way to inject content).
+        // Wrap the stream to capture token usage after the run completes.
         return AsyncThrowingStream { [weak self] continuation in
             Task {
                 do {
@@ -114,10 +103,11 @@ class ClaudeCodeService: StreamService {
                     self?.tokenUsage = currentRunner.tokenUsage
                     #if AGENT_CLI_DEBUG
                     if let usage = currentRunner.tokenUsage {
-                        // Append the usage number of token to the end of the translation result
-//                        continuation.yield(
-//                            "\n\n↳ in \(usage.inputTokens) · cache-write \(usage.cacheCreationInputTokens) · cache-read \(usage.cacheReadInputTokens) · out \(usage.outputTokens)"
-//                        )
+                        // Route usage stats to the debug window only — not into the
+                        // translation stream, which would corrupt displayed text and auto-copy.
+                        ClaudeCodeDebugLogger.shared.post(
+                            "[USAGE] in \(usage.inputTokens) · cache-write \(usage.cacheCreationInputTokens) · cache-read \(usage.cacheReadInputTokens) · out \(usage.outputTokens)"
+                        )
                     }
                     #endif
                     continuation.finish()
