@@ -4740,6 +4740,12 @@
             "value" : "CLI error: %@"
           }
         },
+        "sk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chyba CLI: %@"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4758,6 +4764,12 @@
       "comment" : "The name of Claude Code",
       "localizations" : {
         "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Code"
+          }
+        },
+        "sk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Claude Code"
@@ -4785,6 +4797,12 @@
             "value" : "Claude Code not found. Please install it first."
           }
         },
+        "sk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Code sa nenašiel. Najprv ho nainštalujte."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4807,6 +4825,12 @@
             "value" : "Claude Code is not logged in. Run `claude` to sign in."
           }
         },
+        "sk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Code nie je prihlásený. Spustite `claude` na prihlásenie."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4827,6 +4851,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Claude Code usage limit reached."
+          }
+        },
+        "sk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bol dosiahnutý limit využitia Claude Code."
           }
         },
         "zh-Hans" : {
@@ -4852,6 +4882,12 @@
             "value" : "Clear"
           }
         },
+        "sk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vymazať"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4875,6 +4911,12 @@
             "value" : "Show in Finder"
           }
         },
+        "sk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zobraziť vo Finderi"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4896,6 +4938,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Show Debug Log Window"
+          }
+        },
+        "sk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zobraziť okno debug logu"
           }
         },
         "zh-Hans" : {

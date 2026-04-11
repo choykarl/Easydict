@@ -1,5 +1,5 @@
 //
-//  ClaudeCodeCLIRunner.swift
+//  ClaudeCodeRunner.swift
 //  Easydict
 //
 //  Created by Karl on 2026/04/07.
@@ -290,11 +290,8 @@ final class ClaudeCodeRunner: @unchecked Sendable {
     ///
     /// - Throws: `ClaudeCodeError.notInstalled` if no binary is found.
     private static func detectClaudeBinary() throws -> String {
-        // Fast path: return cached value without acquiring the lock.
-        if let cached = cachedBinaryPath {
-            return cached
-        }
-        // Slow path: acquire lock, re-check (double-checked locking), then resolve.
+        // All reads and writes go through the lock to prevent data races
+        // when multiple translations start concurrently.
         cacheLock.lock()
         defer { cacheLock.unlock() }
         if let cached = cachedBinaryPath {

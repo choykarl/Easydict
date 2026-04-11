@@ -122,7 +122,15 @@ class ClaudeCodeService: StreamService {
                     continuation.finish()
                 } catch {
                     self?.tokenUsage = currentRunner.tokenUsage
-                    continuation.finish(throwing: error)
+                    // Wrap ClaudeCodeError in QueryError so its LocalizedError.errorDescription
+                    // is preserved. QueryError.queryError(from:) falls back to String(describing:)
+                    // for unknown error types, which shows raw enum text instead of the
+                    // user-facing message defined in ClaudeCodeError.errorDescription.
+                    let queryError = QueryError.queryError(from: error) ?? QueryError(
+                        type: .api,
+                        message: error.localizedDescription
+                    )
+                    continuation.finish(throwing: queryError)
                 }
             }
         }
