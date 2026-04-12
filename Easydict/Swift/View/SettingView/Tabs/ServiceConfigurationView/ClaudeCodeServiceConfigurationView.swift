@@ -70,6 +70,9 @@ private struct CLIStatusRow: View {
                     Text(path)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Text("service.claude_code.risk_warning")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
                 } else {
                     Text("service.claude_code.not_installed")
                         .font(.caption)

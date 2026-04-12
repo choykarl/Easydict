@@ -323,6 +323,7 @@ private class ServiceItemViewModel: ObservableObject {
     @Published var name = ""
 
     @Published var showErrorAlert = false
+    @Published var showClaudeCodeRiskAlert = false
     @Published var error: (any Error)?
 
     unowned var viewModel: ServiceTabViewModel
@@ -334,7 +335,11 @@ private class ServiceItemViewModel: ObservableObject {
         set {
             // turn on service
             if newValue {
-                tryEnableService()
+                if service.serviceType() == .claudeCode {
+                    showClaudeCodeRiskAlert = true
+                } else {
+                    tryEnableService()
+                }
             } else {
                 // turn off service
                 updateServiceStatus(enabled: false)
@@ -426,6 +431,20 @@ private struct ServiceItemView: View {
             }
         } message: {
             Text(serviceItemViewModel.error?.localizedDescription ?? "unknown_error")
+        }
+        .alert(
+            "service.claude_code.enable_risk_alert.title",
+            isPresented: $serviceItemViewModel.showClaudeCodeRiskAlert
+        ) {
+            Button("cancel", role: .cancel) {
+                serviceItemViewModel.showClaudeCodeRiskAlert = false
+            }
+            Button("ok") {
+                serviceItemViewModel.showClaudeCodeRiskAlert = false
+                serviceItemViewModel.tryEnableService()
+            }
+        } message: {
+            Text("service.claude_code.enable_risk_alert.message")
         }
     }
 

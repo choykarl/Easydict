@@ -4791,7 +4791,6 @@
     },
     "service.claude_code.debug_log.clear" : {
       "comment" : "Button to clear the debug log",
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4821,7 +4820,6 @@
     },
     "service.claude_code.debug_log.show_in_finder" : {
       "comment" : "Button to reveal the debug log file in Finder",
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4851,7 +4849,6 @@
     },
     "service.claude_code.debug_log.show_window" : {
       "comment" : "Button to open the debug log window",
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4881,7 +4878,6 @@
     },
     "service.claude_code.debug_log.window_title" : {
       "comment" : "Title of the Claude Code debug log panel",
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4905,6 +4901,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Claude Code 調試日誌"
+          }
+        }
+      }
+    },
+    "service.claude_code.enable_risk_alert.message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This service uses your locally installed and logged-in official Claude Code CLI. It does not use OAuth, private APIs, or proxy workarounds. Anthropic may change CLI policies or account rules in the future. Continue only if you understand and accept the potential account or policy risk."
+          }
+        },
+        "sk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Táto služba používa lokálne nainštalované a prihlásené oficiálne Claude Code CLI. Nepoužíva OAuth, súkromné API ani proxy obchádzky. Anthropic môže v budúcnosti zmeniť pravidlá CLI alebo účtov. Pokračujte iba vtedy, ak rozumiete možnému riziku pre účet alebo pravidlá a prijímate ho."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此服务使用你本机已安装并已登录的官方 Claude Code CLI，不使用 OAuth、私有 API 或代理绕行方案。Anthropic 未来可能调整 CLI 政策或账号规则。仅当你理解并接受潜在的账号或政策风险时再继续。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此服務使用你本機已安裝且已登入的官方 Claude Code CLI，不使用 OAuth、私有 API 或代理繞行方案。Anthropic 未來可能調整 CLI 政策或帳號規則。僅當你理解並接受潛在的帳號或政策風險時再繼續。"
+          }
+        }
+      }
+    },
+    "service.claude_code.enable_risk_alert.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Code Risk Notice"
+          }
+        },
+        "sk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Upozornenie na riziko Claude Code"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Code 风险提示"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Code 風險提示"
           }
         }
       }
@@ -5018,6 +5072,35 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Claude Code 用量已用盡"
+          }
+        }
+      }
+    },
+    "service.claude_code.risk_warning" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uses your local official Claude Code CLI. Availability may change in the future and may carry account or policy risk."
+          }
+        },
+        "sk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Používa tvoje lokálne oficiálne Claude Code CLI. Dostupnosť sa môže v budúcnosti zmeniť a môže niesť riziko pre účet alebo pravidlá."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此服务使用你本机的官方 Claude Code CLI，未来可用性可能发生变化，并可能带来账号或政策风险。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此服務使用你本機的官方 Claude Code CLI，未來可用性可能發生變化，並可能帶來帳號或政策風險。"
           }
         }
       }
