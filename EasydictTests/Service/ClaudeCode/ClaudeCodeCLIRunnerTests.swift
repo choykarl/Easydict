@@ -11,6 +11,18 @@ import Testing
 
 @Suite("ClaudeCodeCLIRunner")
 struct ClaudeCodeCLIRunnerTests {
+    @Test("buildArguments includes required stream-json print flags")
+    func buildArgumentsIncludesRequiredStreamJSONPrintFlags() {
+        let arguments = ClaudeCodeRunner.buildArguments(prompt: "Translate this", systemPrompt: nil)
+
+        #expect(arguments.contains("-p"))
+        #expect(arguments.contains("--print"))
+        #expect(arguments.contains("--verbose"))
+        #expect(arguments.contains("--output-format"))
+        #expect(arguments.contains("stream-json"))
+        #expect(arguments.contains("--include-partial-messages"))
+    }
+
     // MARK: - parseError (stderr-only) tests
 
     @Test("parseError returns notLoggedIn when stderr contains 'not logged in'")

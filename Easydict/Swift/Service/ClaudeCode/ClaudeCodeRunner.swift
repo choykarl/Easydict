@@ -10,10 +10,10 @@ import Foundation
 
 // MARK: - ClaudeCodeRunner
 
-/// Wraps a `claude -p` subprocess and yields streaming text deltas as an `AsyncThrowingStream<String, Error>`.
+/// Wraps a `claude -p --print` subprocess and yields streaming text deltas as an `AsyncThrowingStream<String, Error>`.
 ///
-/// Uses `--output-format stream-json --include-partial-messages` so the CLI emits one JSON event
-/// per line. The runner extracts `content_block_delta` text deltas and forwards them to callers,
+/// Uses `--print --verbose --output-format stream-json --include-partial-messages` so the CLI emits
+/// one JSON event per line. The runner extracts `content_block_delta` text deltas and forwards them to callers,
 /// giving token-by-token granularity identical to the Anthropic API SSE stream.
 ///
 /// Each instance represents exactly one subprocess invocation. Create a new instance per translation request.
@@ -50,9 +50,46 @@ final class ClaudeCodeRunner: @unchecked Sendable {
         }
     }
 
-    /// Runs `claude -p` with optimised flags and streams text delta chunks as they arrive.
+    /// Resolves which shell executable should run login-shell detection.
     ///
-    /// The CLI emits one newline-delimited JSON object per event (`--output-format stream-json`).
+    /// Accepts the user's configured shell when it is an absolute executable path,
+    /// and otherwise falls back to `/bin/zsh`.
+    static func resolveLoginShellPath(environmentShell: String?) -> String {
+        guard let environmentShell,
+              environmentShell.hasPrefix("/"),
+              FileManager.default.isExecutableFile(atPath: environmentShell)
+        else {
+            return "/bin/zsh"
+        }
+        return environmentShell
+    }
+
+    /// Builds the argument list for a `claude -p --print` invocation.
+    ///
+    /// The current Claude Code CLI requires `--verbose` when `--print` is combined
+    /// with `--output-format stream-json`.
+    static func buildArguments(prompt: String, systemPrompt: String?) -> [String] {
+        var arguments = [
+            "-p", prompt,
+            "--print",
+            "--verbose",
+            "--output-format", "stream-json",
+            "--include-partial-messages",
+            "--no-session-persistence",
+            "--tools", "", // disable all built-in tools
+            "--strict-mcp-config", // ignore user MCP config; no --mcp-config = no servers
+            "--setting-sources", "", // skip all settings files to prevent plugin hooks
+        ]
+        if let systemPrompt, !systemPrompt.isEmpty {
+            arguments += ["--system-prompt", systemPrompt]
+        }
+        return arguments
+    }
+
+    /// Runs `claude -p --print` with optimised flags and streams text delta chunks as they arrive.
+    ///
+    /// The CLI emits one newline-delimited JSON object per event when invoked with
+    /// `--print --verbose --output-format stream-json`.
     /// This method extracts `text_delta` text from each `content_block_delta` event, giving
     /// token-by-token granularity identical to the Anthropic API SSE stream.
     ///
@@ -352,26 +389,6 @@ final class ClaudeCodeRunner: @unchecked Sendable {
         }
     }
 
-    /// Builds the argument list for a `claude -p` invocation.
-    private static func buildArguments(prompt: String, systemPrompt: String?) -> [String] {
-        var arguments = [
-            "-p", prompt,
-            "--output-format", "stream-json",
-            "--include-partial-messages",
-            "--no-session-persistence",
-            "--tools", "", // disable all built-in tools
-            "--strict-mcp-config", // ignore user MCP config; no --mcp-config = no servers
-            "--setting-sources", "", // skip all settings files to prevent plugin hooks
-        ]
-        #if AGENT_CLI_DEBUG
-        arguments.append("--verbose")
-        #endif
-        if let systemPrompt, !systemPrompt.isEmpty {
-            arguments += ["--system-prompt", systemPrompt]
-        }
-        return arguments
-    }
-
     /// Returns the path to the first `claude` binary found on this machine.
     ///
     /// The result is cached after the first successful lookup so the login-shell
@@ -430,20 +447,6 @@ final class ClaudeCodeRunner: @unchecked Sendable {
             return path
         }
         throw ClaudeCodeError.notInstalled
-    }
-
-    /// Resolves which shell executable should run login-shell detection.
-    ///
-    /// Accepts the user's configured shell when it is an absolute executable path,
-    /// and otherwise falls back to `/bin/zsh`.
-    static func resolveLoginShellPath(environmentShell: String?) -> String {
-        guard let environmentShell,
-              environmentShell.hasPrefix("/"),
-              FileManager.default.isExecutableFile(atPath: environmentShell)
-        else {
-            return "/bin/zsh"
-        }
-        return environmentShell
     }
 
     /// Runs a command via the user's login shell, returning trimmed stdout or nil on failure.
