@@ -4791,6 +4791,7 @@
     },
     "service.claude_code.debug_log.clear" : {
       "comment" : "Button to clear the debug log",
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4820,6 +4821,7 @@
     },
     "service.claude_code.debug_log.show_in_finder" : {
       "comment" : "Button to reveal the debug log file in Finder",
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4849,6 +4851,7 @@
     },
     "service.claude_code.debug_log.show_window" : {
       "comment" : "Button to open the debug log window",
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4878,6 +4881,7 @@
     },
     "service.claude_code.debug_log.window_title" : {
       "comment" : "Title of the Claude Code debug log panel",
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

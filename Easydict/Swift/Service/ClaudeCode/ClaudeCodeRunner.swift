@@ -250,9 +250,11 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                             let controlBuffer = stdoutControlLines.joined(separator: "\n")
                             self?.tokenUsage = parseTokenUsage(from: controlBuffer)
 
+                            #if AGENT_CLI_DEBUG
                             ClaudeCodeDebugLogger.shared.post(
                                 "[EXIT] code=\(exitCode)  duration=\(String(format: "%.1f", duration))s"
                             )
+                            #endif
 
                             if exitCode != 0, !wasCancelled {
                                 let error = parseError(fromStdout: controlBuffer, stderr: stderrBuffer)
@@ -392,33 +394,45 @@ final class ClaudeCodeRunner: @unchecked Sendable {
     /// Returns the path to the first `claude` binary found on this machine.
     ///
     /// The result is cached after the first successful lookup so the login-shell
-    /// invocation only happens once per app session.
+    /// invocation only happens once per app session. The cached path is revalidated
+    /// on each call so that uninstall or upgrade is detected automatically.
+    ///
+    /// The lock is held through the entire slow-path probe to prevent concurrent
+    /// first-time callers from each spawning a login shell simultaneously.
     ///
     /// - Throws: `ClaudeCodeError.notInstalled` if no binary is found.
     private static func detectClaudeBinary() throws -> String {
-        // Fast path: return the cached path without performing slow shell detection.
-        // Only the cache read/write is held under the lock; the actual binary probing
-        // runs outside the critical section so concurrent requests do not all serialize
-        // behind a single login-shell invocation.
         cacheLock.lock()
-        if let cached = cachedBinaryPath {
-            cacheLock.unlock()
-            return cached
-        }
-        cacheLock.unlock()
+        defer { cacheLock.unlock() }
 
-        // Slow path: probe for the binary outside the critical section.
+        // Fast path: return cached path only if it still exists and is executable.
+        // Re-checking prevents stale cache entries after a claude uninstall or upgrade.
+        if let cached = cachedBinaryPath {
+            if FileManager.default.isExecutableFile(atPath: cached) {
+                return cached
+            }
+            // Cached path is stale — clear it and fall through to re-detect.
+            cachedBinaryPath = nil
+        }
+
+        // Slow path: probe for the binary while holding the lock so that concurrent
+        // first-time callers block here rather than each spawning their own login shell.
         var resolvedPath: String?
 
         // 1. Try via login shell so PATH from ~/.zshrc / ~/.bash_profile is available.
         //    GUI apps do not inherit the user's shell PATH, so a plain `which` call fails.
-        //    Login shells may emit banner text or alias output before the actual path, so
-        //    split by newline and find the first line that is an executable file.
+        //    Login shell startup scripts can emit arbitrary output (banners, alias definitions,
+        //    etc.) before the actual path, so split on newlines and accept only the first
+        //    line whose basename is "claude" and that points to an executable file.
         if let raw = runViaLoginShell("which claude") {
             resolvedPath = raw
                 .components(separatedBy: "\n")
                 .map { $0.trimmingCharacters(in: .whitespaces) }
-                .first { !$0.isEmpty && FileManager.default.isExecutableFile(atPath: $0) }
+                .first {
+                    !$0.isEmpty
+                        && URL(fileURLWithPath: $0).lastPathComponent == "claude"
+                        && FileManager.default.isExecutableFile(atPath: $0)
+                }
         }
 
         // 2. Check common manual-install locations as fallback.
@@ -435,13 +449,6 @@ final class ClaudeCodeRunner: @unchecked Sendable {
             }
         }
 
-        // Re-acquire the lock to write the result.
-        // Re-check the cache in case another concurrent call completed detection first.
-        cacheLock.lock()
-        defer { cacheLock.unlock() }
-        if let cached = cachedBinaryPath {
-            return cached
-        }
         if let path = resolvedPath {
             cachedBinaryPath = path
             return path

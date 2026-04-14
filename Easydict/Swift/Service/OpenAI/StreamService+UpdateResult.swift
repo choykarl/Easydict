@@ -89,11 +89,20 @@ extension StreamService {
             finalText = finalText.filterThinkTagContent().trim()
         }
 
+        // When this call is the one that marks the stream as finished (markStreamFinished: true),
+        // apply the same empty-result check that the already-finished guard (above) applies.
+        // Without this, a stream that completes with no output and no error would surface as
+        // success with translatedResults = [""] instead of a .noResult failure.
+        var completionError: Error? = error
+        if markStreamFinished, finalText.isEmpty, error == nil {
+            completionError = QueryError(type: .noResult)
+        }
+
         let updateCompletion = { [weak result] in
             guard let result else { return }
 
             result.translatedResults = [finalText]
-            completeWithResult(result, error: error)
+            completeWithResult(result, error: completionError)
         }
 
         switch queryType {
