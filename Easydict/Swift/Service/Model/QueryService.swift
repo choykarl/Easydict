@@ -248,6 +248,8 @@ open class QueryService: NSObject {
                         completionHandler(result, result.error)
                     }
                 }
+            } catch is CancellationError {
+                // Task was cancelled, nothing to report.
             } catch {
                 if !didYieldError {
                     let errorResult = ensureResult()
@@ -309,6 +311,8 @@ open class QueryService: NSObject {
                         continuation.yield(result)
                     }
 
+                    continuation.finish()
+                } catch is CancellationError {
                     continuation.finish()
                 } catch {
                     if !didYieldError {
@@ -392,6 +396,8 @@ open class QueryService: NSObject {
                 do {
                     let result = try await self.translate(text, from: from, to: to)
                     continuation.yield(result)
+                    continuation.finish()
+                } catch is CancellationError {
                     continuation.finish()
                 } catch {
                     let errorResult = self.ensureResult()
