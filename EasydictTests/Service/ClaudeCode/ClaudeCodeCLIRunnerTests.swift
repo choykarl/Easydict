@@ -7,10 +7,13 @@
 //
 
 @testable import Easydict
+import Foundation
 import Testing
 
 @Suite("ClaudeCodeCLIRunner")
 struct ClaudeCodeCLIRunnerTests {
+    // MARK: Internal
+
     @Test("buildArguments includes required stream-json print flags")
     func buildArgumentsIncludesRequiredStreamJSONPrintFlags() {
         let arguments = ClaudeCodeRunner.buildArguments(prompt: "Translate this", systemPrompt: nil)
@@ -74,6 +77,33 @@ struct ClaudeCodeCLIRunnerTests {
         let rateLimitLine = #"{"type":"rate_limit_event","rate_limit_info":{"status":"rejected"}}"#
         let error = parseError(fromStdout: rateLimitLine, stderr: "")
         #expect(error == .quotaExceeded(message: nil))
+    }
+
+    @Test("parseError returns notLoggedIn when stdout result requests login")
+    func parseErrorNotLoggedInFromStdoutResult() {
+        let stdout =
+            #"{"type":"result","subtype":"success","is_error":true,"result":"Not logged in · Please run /login","# +
+            #""duration_ms":91,"total_cost_usd":0,"usage":{},"modelUsage":{}}"#
+        let error = parseError(fromStdout: stdout, stderr: "")
+        #expect(error == .notLoggedIn)
+    }
+
+    @Test("parseError returns notLoggedIn when assistant event reports authentication failure")
+    func parseErrorAssistantAuthenticationFailure() {
+        let stdout =
+            #"{"type":"assistant","message":{"content":[{"type":"text","text":"Not logged in · Please run /login"}]},"# +
+            #""error":"authentication_failed"}"#
+        let error = parseError(fromStdout: stdout, stderr: "")
+        #expect(error == .notLoggedIn)
+    }
+
+    @Test("parseError returns cliError when stdout result has a generic failure message")
+    func parseErrorGenericStdoutResult() {
+        let stdout =
+            #"{"type":"result","subtype":"success","is_error":true,"result":"Something failed upstream","# +
+            #""duration_ms":91,"total_cost_usd":0,"usage":{},"modelUsage":{}}"#
+        let error = parseError(fromStdout: stdout, stderr: "")
+        #expect(error == .cliError(message: "Something failed upstream"))
     }
 
     @Test("parseError falls back to stderr when stdout has no rate_limit_event")
@@ -175,5 +205,78 @@ struct ClaudeCodeCLIRunnerTests {
     func resolveLoginShellPathFallsBackForNonExecutableAbsolutePath() {
         let shell = ClaudeCodeRunner.resolveLoginShellPath(environmentShell: "/tmp/not-a-shell")
         #expect(shell == "/bin/zsh")
+    }
+
+    @Test("loadClaudeSettingsEnvironment returns string env pairs from settings file")
+    func loadClaudeSettingsEnvironmentReturnsStringPairs() throws {
+        let settingsURL = try makeTemporarySettingsFile(
+            """
+            {
+              "env": {
+                "ANTHROPIC_AUTH_TOKEN": "token-123",
+                "ANTHROPIC_BASE_URL": "http://127.0.0.1:8317"
+              }
+            }
+            """
+        )
+
+        let environment = ClaudeCodeRunner.loadClaudeSettingsEnvironment(settingsURL: settingsURL)
+
+        #expect(environment["ANTHROPIC_AUTH_TOKEN"] == "token-123")
+        #expect(environment["ANTHROPIC_BASE_URL"] == "http://127.0.0.1:8317")
+    }
+
+    @Test("loadClaudeSettingsEnvironment returns empty dictionary when settings file is missing")
+    func loadClaudeSettingsEnvironmentMissingFile() {
+        let settingsURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathComponent("settings.json")
+
+        let environment = ClaudeCodeRunner.loadClaudeSettingsEnvironment(settingsURL: settingsURL)
+
+        #expect(environment.isEmpty)
+    }
+
+    @Test("loadClaudeSettingsEnvironment returns empty dictionary for malformed JSON")
+    func loadClaudeSettingsEnvironmentMalformedJSON() throws {
+        let settingsURL = try makeTemporarySettingsFile("{ invalid json")
+
+        let environment = ClaudeCodeRunner.loadClaudeSettingsEnvironment(settingsURL: settingsURL)
+
+        #expect(environment.isEmpty)
+    }
+
+    @Test("loadClaudeSettingsEnvironment returns empty dictionary for non-string env values")
+    func loadClaudeSettingsEnvironmentNonStringValues() throws {
+        let settingsURL = try makeTemporarySettingsFile(
+            """
+            {
+              "env": {
+                "ANTHROPIC_AUTH_TOKEN": "token-123",
+                "CLAUDE_PORT": 8317
+              }
+            }
+            """
+        )
+
+        let environment = ClaudeCodeRunner.loadClaudeSettingsEnvironment(settingsURL: settingsURL)
+
+        #expect(environment.isEmpty)
+    }
+
+    // MARK: Private
+
+    /// Creates a temporary Claude settings file for loader tests.
+    private func makeTemporarySettingsFile(_ content: String) throws -> URL {
+        let temporaryDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: temporaryDirectory,
+            withIntermediateDirectories: true
+        )
+
+        let settingsURL = temporaryDirectory.appendingPathComponent("settings.json")
+        try content.write(to: settingsURL, atomically: true, encoding: .utf8)
+        return settingsURL
     }
 }

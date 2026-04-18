@@ -86,6 +86,48 @@ final class ClaudeCodeRunner: @unchecked Sendable {
         return arguments
     }
 
+    /// Loads string env vars from the user's Claude settings file.
+    ///
+    /// Returns an empty dictionary if the file is missing, unreadable, malformed,
+    /// has no `env` object, or the `env` object contains non-string values.
+    static func loadClaudeSettingsEnvironment(settingsURL: URL? = nil) -> [String: String] {
+        let resolvedSettingsURL = settingsURL
+            ?? URL(fileURLWithPath: NSHomeDirectory())
+            .appendingPathComponent(".claude")
+            .appendingPathComponent("settings.json")
+
+        guard let settingsData = try? Data(contentsOf: resolvedSettingsURL),
+              let settings = try? JSONDecoder().decode(
+                  ClaudeUserSettings.self,
+                  from: settingsData
+              ),
+              let environment = settings.env else {
+            return [:]
+        }
+
+        return environment
+    }
+
+    /// Builds the subprocess environment for the Claude CLI invocation.
+    ///
+    /// Claude settings sources remain disabled, but the user's configured
+    /// `env` block is injected explicitly so auth and proxy settings still
+    /// reach the subprocess.
+    static func buildProcessEnvironment(
+        settingsURL: URL? = nil,
+        inheritedEnvironment: [String: String] = ProcessInfo.processInfo.environment
+    )
+        -> [String: String] {
+        var processEnvironment = inheritedEnvironment
+        let settingsEnvironment = loadClaudeSettingsEnvironment(settingsURL: settingsURL)
+
+        for (key, value) in settingsEnvironment {
+            processEnvironment[key] = value
+        }
+
+        return processEnvironment
+    }
+
     /// Runs `claude -p --print` with optimised flags and streams text delta chunks as they arrive.
     ///
     /// The CLI emits one newline-delimited JSON object per event when invoked with
@@ -102,7 +144,8 @@ final class ClaudeCodeRunner: @unchecked Sendable {
     /// - `--no-session-persistence` — skips session file I/O.
     /// - `--setting-sources ""` — skips loading all settings files (user/project/local), which
     ///   prevents plugins (e.g. superpowers) from registering their SessionStart hooks.
-    ///   Credentials are still read from the keychain, so OAuth authentication is unaffected.
+    ///   The user's `~/.claude/settings.json` `env` block is injected separately so auth and
+    ///   proxy variables still reach the subprocess without re-enabling hooks or plugins.
     ///
     /// - Parameters:
     ///   - prompt: The conversation prompt (user / assistant messages only, without system message).
@@ -146,6 +189,9 @@ final class ClaudeCodeRunner: @unchecked Sendable {
                     process.standardError = stderrPipe
                     // Use a neutral working directory so claude does not scan user folders.
                     process.currentDirectoryURL = FileManager.default.temporaryDirectory
+                    // Keep Claude settings sources disabled, but explicitly inject
+                    // user-configured env vars such as auth and proxy settings.
+                    process.environment = Self.buildProcessEnvironment()
 
                     let startTime = Date()
                     // Raw stderr bytes; decoded to String once in the termination handler
@@ -312,6 +358,11 @@ final class ClaudeCodeRunner: @unchecked Sendable {
     }
 
     // MARK: Private
+
+    /// User-scoped Claude settings used only for explicit env injection.
+    private struct ClaudeUserSettings: Decodable {
+        let env: [String: String]?
+    }
 
     /// Cached path from the first successful `detectClaudeBinary()` call.
     /// Avoids spawning a login shell on every translation request.

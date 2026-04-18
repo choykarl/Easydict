@@ -33,6 +33,48 @@ struct CLITokenUsage {
 
 // MARK: - Parse helpers
 
+/// Returns `true` when a message indicates Claude authentication failure.
+private func isClaudeAuthenticationMessage(_ message: String) -> Bool {
+    let lowercasedMessage = message.lowercased()
+    return lowercasedMessage.contains("not logged in")
+        || lowercasedMessage.contains("please run /login")
+        || lowercasedMessage.contains("authentication_failed")
+        || lowercasedMessage.contains("authentication failed")
+        || lowercasedMessage.contains("unauthorized")
+        || lowercasedMessage.contains("not authenticated")
+}
+
+/// Returns `true` when a message indicates quota or rate-limit failure.
+private func isClaudeQuotaMessage(_ message: String) -> Bool {
+    let lowercasedMessage = message.lowercased()
+    return lowercasedMessage.contains("rate limit")
+        || lowercasedMessage.contains("quota")
+        || lowercasedMessage.contains("usage limit")
+}
+
+/// Extracts a human-readable error message from one CLI output line.
+private func stdoutErrorMessage(from line: CLIStreamJSONLine) -> String? {
+    if line.type == "result",
+       line.isError == true,
+       let resultMessage = line.result?.trimmingCharacters(in: .whitespacesAndNewlines),
+       !resultMessage.isEmpty {
+        return resultMessage
+    }
+
+    if let errorValue = line.error?.trimmingCharacters(in: .whitespacesAndNewlines),
+       !errorValue.isEmpty {
+        let assistantMessage = line.message?.firstText?.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        if let assistantMessage, !assistantMessage.isEmpty {
+            return assistantMessage
+        }
+        return errorValue
+    }
+
+    return nil
+}
+
 /// Parses a `ClaudeCodeError` by inspecting stdout JSON events first, then falling back to stderr.
 ///
 /// The Claude Code CLI reports quota / rate-limit failures via a `rate_limit_event` JSON line
@@ -41,24 +83,53 @@ struct CLITokenUsage {
 /// point contains only macOS system noise, so checking stderr alone produces an empty message.
 func parseError(fromStdout stdout: String, stderr: String) -> ClaudeCodeError {
     // 1. Scan stdout for a rate_limit_event — this is the authoritative quota signal.
-    //    Also capture the result message so we can surface the reset-time hint.
+    //    Also capture auth and generic error messages emitted in stdout events.
     var hasRateLimitEvent = false
-    var resultMessage: String?
+    var stdoutAuthMessage: String?
+    var stdoutQuotaMessage: String?
+    var stdoutGenericMessage: String?
+    let decoder = JSONDecoder()
 
     for line in stdout.components(separatedBy: "\n") where !line.isEmpty {
         guard let data = line.data(using: .utf8) else { continue }
-        if let event = try? JSONDecoder().decode(CLIStreamJSONLine.self, from: data) {
+        if let event = try? decoder.decode(CLIStreamJSONLine.self, from: data) {
             if event.type == "rate_limit_event" {
                 hasRateLimitEvent = true
             }
-            if event.type == "result", event.isError == true, let msg = event.result, !msg.isEmpty {
-                resultMessage = msg
+
+            if let message = stdoutErrorMessage(from: event) {
+                if stdoutGenericMessage == nil {
+                    stdoutGenericMessage = message
+                }
+                if stdoutAuthMessage == nil, isClaudeAuthenticationMessage(message) {
+                    stdoutAuthMessage = message
+                }
+                if stdoutQuotaMessage == nil, isClaudeQuotaMessage(message) {
+                    stdoutQuotaMessage = message
+                }
+            }
+
+            if let errorValue = event.error {
+                if stdoutAuthMessage == nil, isClaudeAuthenticationMessage(errorValue) {
+                    stdoutAuthMessage = stdoutErrorMessage(from: event) ?? errorValue
+                }
+                if stdoutQuotaMessage == nil, isClaudeQuotaMessage(errorValue) {
+                    stdoutQuotaMessage = stdoutErrorMessage(from: event) ?? errorValue
+                }
             }
         }
     }
 
     if hasRateLimitEvent {
-        return .quotaExceeded(message: resultMessage)
+        return .quotaExceeded(message: stdoutQuotaMessage ?? stdoutGenericMessage)
+    }
+
+    if stdoutAuthMessage != nil {
+        return .notLoggedIn
+    }
+
+    if let stdoutQuotaMessage {
+        return .quotaExceeded(message: stdoutQuotaMessage)
     }
 
     // 2. Fall back to stderr inspection (authentication errors, unknown CLI failures).
@@ -68,12 +139,14 @@ func parseError(fromStdout stdout: String, stderr: String) -> ClaudeCodeError {
         .joined(separator: "\n")
         .trimmingCharacters(in: .whitespacesAndNewlines)
 
-    let lower = cleaned.lowercased()
-    if lower.contains("not logged in") || lower.contains("authentication") || lower.contains("login") {
+    if isClaudeAuthenticationMessage(cleaned) {
         return .notLoggedIn
     }
-    if lower.contains("rate limit") || lower.contains("quota") || lower.contains("usage limit") {
+    if isClaudeQuotaMessage(cleaned) {
         return .quotaExceeded(message: nil)
+    }
+    if let stdoutGenericMessage, !stdoutGenericMessage.isEmpty {
+        return .cliError(message: stdoutGenericMessage)
     }
     // Use the cleaned stderr text if available; fall back to a localized generic message so
     // the caller never receives an empty string that gives the user no actionable information.
@@ -135,7 +208,7 @@ func extractTextDelta(from line: String, decoder: JSONDecoder = JSONDecoder()) -
 /// Outer wrapper for one newline-delimited event from `--output-format stream-json`.
 private struct CLIStreamJSONLine: Decodable {
     enum CodingKeys: String, CodingKey {
-        case type, event, result, usage
+        case type, event, result, usage, message, error
         case isError = "is_error"
         case totalCostUSD = "total_cost_usd"
         case durationMs = "duration_ms"
@@ -149,6 +222,10 @@ private struct CLIStreamJSONLine: Decodable {
     let result: String?
     /// Present when `type == "result"`. `true` when the run ended with an error.
     let isError: Bool?
+    /// Present for assistant events carrying structured text blocks.
+    let message: CLIStreamMessage?
+    /// Present for assistant events when the CLI reports a machine-readable failure.
+    let error: String?
     /// Present when `type == "result"`. Token usage for this invocation.
     let usage: CLIRawUsage?
     /// Present when `type == "result"`. Equivalent API cost in USD.
@@ -176,6 +253,25 @@ private struct CLIRawUsage: Decodable {
     let cacheCreationInputTokens: Int?
     let cacheReadInputTokens: Int?
     let outputTokens: Int?
+}
+
+// MARK: - CLIStreamMessage
+
+/// Minimal assistant message wrapper from Claude `stream-json` output.
+private struct CLIStreamMessage: Decodable {
+    let content: [CLIStreamMessageContent]?
+
+    var firstText: String? {
+        content?.first(where: { $0.type == "text" })?.text
+    }
+}
+
+// MARK: - CLIStreamMessageContent
+
+/// One content block inside an assistant message payload.
+private struct CLIStreamMessageContent: Decodable {
+    let type: String
+    let text: String?
 }
 
 // MARK: - CLIInnerEvent
